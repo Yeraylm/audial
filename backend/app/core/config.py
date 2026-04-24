@@ -48,7 +48,10 @@ class Settings(BaseSettings):
     # None = detección automática de idioma. 'es' o 'en' para forzar.
     whisper_language: str | None = os.getenv("WHISPER_LANGUAGE") or None
 
-    # --- Ollama LLM ---
+    # --- LLM (Groq cloud gratis o Ollama local) ---
+    # Si GROQ_API_KEY tiene valor, se usa Groq. Si no, Ollama.
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     ollama_host: str = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3:8b")
     ollama_fallback_models: list[str] = ["mistral:7b", "qwen2.5:7b-instruct"]

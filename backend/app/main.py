@@ -1,8 +1,4 @@
-"""Punto de entrada FastAPI.
-
-Levanta la aplicacion, monta las rutas, sirve el frontend estatico y
-crea las tablas de la base de datos en el primer arranque.
-"""
+"""Punto de entrada FastAPI."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,11 +15,7 @@ from app.routes import analysis, audio, dashboard, search
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
-    description=(
-        "Plataforma inteligente de analisis de conversaciones de audio: "
-        "transcripcion (Whisper local), analisis semantico con LLM local "
-        "(Ollama), diarizacion, busqueda vectorial y arquitectura Big Data."
-    ),
+    description="Plataforma IA de análisis de conversaciones de audio.",
 )
 
 app.add_middleware(
@@ -34,7 +26,6 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-# --- API routes ---
 app.include_router(audio.router)
 app.include_router(analysis.router)
 app.include_router(search.router)
@@ -51,12 +42,16 @@ def health() -> dict[str, str]:
     return {"status": "ok", "app": settings.app_name, "version": "1.0.0"}
 
 
-# --- Static frontend ---
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 if FRONTEND_DIR.exists():
-    # Montar subdirectorios para evitar conflictos con rutas /api
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+    # Mount CSS, JS and assets at their real sub-paths.
+    # This matches what Netlify serves (frontend/ is the publish dir),
+    # so /css/styles.css works both locally and on Netlify.
+    for sub in ("css", "js", "assets"):
+        sub_dir = FRONTEND_DIR / sub
+        sub_dir.mkdir(exist_ok=True)
+        app.mount(f"/{sub}", StaticFiles(directory=sub_dir), name=sub)
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
@@ -67,12 +62,8 @@ if FRONTEND_DIR.exists():
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> Response:
-        # favicon inline para evitar 404 (el real viene como SVG dentro del HTML)
         return Response(status_code=204)
 else:
     @app.get("/", include_in_schema=False)
     def _missing() -> dict[str, str]:
-        return {
-            "error": f"Frontend no encontrado en {FRONTEND_DIR}",
-            "hint": "Ejecuta desde la raiz del proyecto o verifica PYTHONPATH",
-        }
+        return {"error": f"Frontend not found at {FRONTEND_DIR}"}

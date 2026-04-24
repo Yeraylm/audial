@@ -1,29 +1,26 @@
-# Netlify configuration for the Audial frontend.
-# The Python backend (FastAPI) must run on a separate service
-# such as Render (render.yaml) or Railway.
+# Netlify — frontend estático de Audial
+# El backend corre en Hugging Face Spaces (gratis).
 #
-# Once the backend is deployed, set the environment variable:
-#   AUDIAL_API_URL = https://audial-backend.onrender.com
-# in the Netlify site settings → Environment variables.
-# The _redirects rule below will proxy /api/* to that backend.
+# Configuración en Netlify Dashboard → Site settings → Environment variables:
+#   AUDIAL_API_URL = https://<tu-usuario>-audial-backend.hf.space
+#
+# Si el backend está en otro servicio, pon su URL aquí.
 
 [build]
   publish = "frontend"
-  # No build command needed — pure static HTML/JS
+  command = ""   # sin build — HTML/JS/CSS estático puro
 
 [build.environment]
-  # Override in Netlify dashboard with the actual backend URL
-  AUDIAL_API_URL = ""
+  AUDIAL_API_URL = ""   # sobreescribir en Netlify Dashboard
 
-# Proxy /api/* to the backend (avoids CORS issues)
+# Proxy /api/* al backend (evita CORS y expone una sola URL)
 [[redirects]]
   from   = "/api/*"
   to     = ":AUDIAL_API_URL/api/:splat"
   status = 200
   force  = true
-  conditions = {Role = ["admin", "editor"]}
 
-# SPA fallback — serve index.html for all routes
+# SPA fallback
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
@@ -33,12 +30,10 @@
   for = "/*"
   [headers.values]
     X-Frame-Options        = "SAMEORIGIN"
-    X-XSS-Protection       = "1; mode=block"
     X-Content-Type-Options = "nosniff"
-    Referrer-Policy        = "strict-origin-when-cross-origin"
     Cache-Control          = "public, max-age=3600"
 
 [[headers]]
   for = "/*.html"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "no-cache"
