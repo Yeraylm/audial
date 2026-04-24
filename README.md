@@ -10,9 +10,19 @@ app_port: 7860
 
 # Audial — Plataforma IA Conversacional
 
-> Transcribe, analiza y extrae conocimiento de tus audios con IA 100% local.
+> Transcribe, analiza y extrae conocimiento de tus audios con IA 100% local o en cloud gratuito.
 
-**Stack:** FastAPI · faster-whisper · Ollama (Llama 3 / Mistral / Qwen) · Chroma · Bootstrap 5
+**Stack:** FastAPI · faster-whisper · Groq (Llama 3.3 70B) / Ollama · Chroma · Bootstrap 5
+
+---
+
+## Variables de entorno requeridas (HF Spaces → Settings → Variables)
+
+| Variable | Descripción |
+|----------|-------------|
+| `GROQ_API_KEY` | API key de [Groq](https://console.groq.com) (gratis) |
+| `DATABASE_URL` | URL PostgreSQL de [Supabase](https://supabase.com) (gratis) |
+| `WHISPER_MODEL` | `tiny` (por defecto en cloud) |
 
 ---
 
@@ -32,62 +42,27 @@ app_port: 7860
 
 ## Instalación local
 
-### Windows
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\install_windows.ps1
-```
-
-### Linux / macOS
-
-```bash
-bash scripts/install_linux.sh
-```
-
-### Arrancar
-
 ```powershell
 # Windows
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\install_windows.ps1
 $env:PYTHONPATH = "E:\<ruta>\audial\backend"
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend
 ```
 
 ```bash
 # Linux/macOS
-bash scripts/start.sh
-```
-
-Abre **http://localhost:8000**
-
----
-
-## Configuración rápida (`.env`)
-
-```env
-WHISPER_MODEL=small          # tiny | base | small | medium
-OLLAMA_MODEL=llama3:8b
-WHISPER_LANGUAGE=            # vacío = auto-detect
-DATABASE_URL=sqlite:///./data/platform.db
-VECTOR_BACKEND=chroma
+bash scripts/install_linux.sh && bash scripts/start.sh
 ```
 
 ---
 
-## Deploy online
+## Deploy gratuito
 
-### Frontend → Netlify
-
-1. Conecta este repo en [netlify.com](https://netlify.com)
-2. Build: `(none)` · Publish: `frontend`
-3. Añade variable de entorno: `AUDIAL_API_URL=<url-del-backend>`
-
-### Backend → Render
-
-1. Conecta este repo en [render.com](https://render.com)
-2. El archivo `render.yaml` configura todo automáticamente
-
-> ⚠️ El tier gratuito de Render no incluye GPU. Usa `WHISPER_MODEL=tiny` y configura Ollama en una VM aparte o usa un proveedor cloud de LLM.
+- **Frontend** → [Netlify](https://netlify.com) (directorio `frontend/`)
+- **Backend** → Hugging Face Spaces (este Space)
+- **LLM** → [Groq API](https://console.groq.com) — Llama 3.3 70B gratis
+- **BD** → [Supabase](https://supabase.com) — PostgreSQL 500 MB gratis
 
 ---
 
@@ -97,12 +72,4 @@ VECTOR_BACKEND=chroma
 Audio (Bronze) → Transcripción + Diarización (Silver) → Análisis LLM (Gold)
 ```
 
-- **Bronze:** archivos de audio + manifest parquet  
-- **Silver:** transcripciones normalizadas con timestamps y hablantes  
-- **Gold:** JSON estructurado con 14+ extracciones semánticas
-
----
-
-## Licencia
-
-MIT — Trabajo de Fin de Máster 2026.
+MIT — TFM 2026
