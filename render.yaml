@@ -1,0 +1,36 @@
+# Render.com — free-tier Python web service for the Audial backend.
+# Deploy: connect the GitHub repo "audial" in Render dashboard → New Web Service
+# Root directory: /   Environment: Python 3.11
+
+services:
+  - type: web
+    name: audial-backend
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r backend/requirements-minimal.txt
+    startCommand: >
+      uvicorn backend.app.main:app
+      --host 0.0.0.0
+      --port $PORT
+      --workers 1
+    envVars:
+      - key: PYTHONPATH
+        value: backend
+      - key: WHISPER_MODEL
+        value: tiny          # Use tiny on free tier (limited RAM)
+      - key: WHISPER_DEVICE
+        value: cpu
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8
+      - key: OLLAMA_HOST
+        value: ""            # Set to your Ollama instance or leave empty
+      - key: DATABASE_URL
+        value: "sqlite:///./data/platform.db"
+      - key: VECTOR_BACKEND
+        value: chroma
+    disk:
+      name: data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

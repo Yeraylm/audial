@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audial · Plataforma IA Conversacional</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' x2='1' y2='1'><stop offset='0' stop-color='%23F5A623'/><stop offset='1' stop-color='%23E85A4F'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><path d='M8 20 Q16 8 24 20' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/><circle cx='8' cy='20' r='2' fill='%23fff'/><circle cx='24' cy='20' r='2' fill='%23fff'/></svg>" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+
+<!-- Scroll progress -->
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<!-- Custom cursor -->
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- Background -->
+<div class="bg-mesh">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg sticky-top glass-nav">
+  <div class="container-xl">
+    <a class="navbar-brand d-flex align-items-center gap-2 magnetic" href="#" onclick="showPage('upload');return false;">
+      <div class="logo-wrap">
+        <svg viewBox="0 0 28 28" width="20" height="20">
+          <defs><linearGradient id="lg" x1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5A623"/><stop offset="1" stop-color="#E85A4F"/></linearGradient></defs>
+          <path d="M4 18 Q14 4 24 18" stroke="url(#lg)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <circle cx="4" cy="18" r="2.5" fill="url(#lg)"/>
+          <circle cx="24" cy="18" r="2.5" fill="url(#lg)"/>
+          <path d="M8 18 Q14 10 20 18" stroke="url(#lg)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-text">Audial</div>
+        <div class="brand-sub">IA local · TFM</div>
+      </div>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav ms-auto gap-1 align-items-lg-center">
+        <li class="nav-item"><a class="nav-link nav-pill active" data-page="upload" href="#"><i data-lucide="upload-cloud" class="nav-icon"></i> <span data-i18n="nav.upload">Ingestar</span></a></li>
+        <li class="nav-item"><a class="nav-link nav-pill" data-page="conversations" href="#"><i data-lucide="list" class="nav-icon"></i> <span data-i18n="nav.conversations">Conversaciones</span> <span class="audio-count-badge" id="navCount"></span></a></li>
+        <li class="nav-item"><a class="nav-link nav-pill" data-page="dashboard" href="#"><i data-lucide="bar-chart-3" class="nav-icon"></i> <span data-i18n="nav.dashboard">Dashboard</span></a></li>
+        <li class="nav-item"><a class="nav-link nav-pill" data-page="chat" href="#"><i data-lucide="message-square" class="nav-icon"></i> <span data-i18n="nav.chat">Asistente</span></a></li>
+        <li class="nav-item"><a class="nav-link nav-pill text-muted" href="/docs" target="_blank"><i data-lucide="book-open" class="nav-icon"></i> <span data-i18n="nav.api">API</span></a></li>
+        <li class="nav-item ms-lg-2">
+          <div class="lang-switch">
+            <button data-lang-btn="es" onclick="i18n.setLang('es')">ES</button>
+            <button data-lang-btn="en" onclick="i18n.setLang('en')">EN</button>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="container-xl main-content">
+
+<!-- ============ UPLOAD ============ -->
+<section class="page active" id="page-upload">
+  <div class="hero text-center">
+    <div class="hero-badge reveal">
+      <span class="pulse-dot"></span> <span data-i18n="hero.badge">100% local · sin cloud · sin GPU obligatoria</span>
+    </div>
+    <h1 class="hero-title reveal">
+      <span data-i18n="hero.title.pre">Transforma</span>
+      <span class="accent-grad animated-grad" data-i18n="hero.title.mid">horas de audio</span><br>
+      <span data-i18n="hero.title.post">en</span>
+      <span class="italic-serif" data-i18n="hero.title.italic">conocimiento estructurado</span>
+    </h1>
+    <p class="hero-sub reveal" data-i18n="hero.sub">
+      Transcripción, análisis semántico avanzado, búsqueda vectorial y asistente conversacional
+      con modelos de IA ejecutándose íntegramente en tu PC.
+    </p>
+  </div>
+
+  <!-- Dropzone -->
+  <div class="upload-box reveal" id="dropzone">
+    <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.ogg,.flac" hidden />
+    <div class="upload-ring">
+      <svg viewBox="0 0 120 120" class="upload-ring-svg">
+        <defs>
+          <linearGradient id="ring-grad" x1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#F5A623"/>
+            <stop offset="1" stop-color="#E85A4F"/>
+          </linearGradient>
+        </defs>
+        <circle cx="60" cy="60" r="54" class="ring-track"/>
+        <circle cx="60" cy="60" r="54" class="ring-progress" id="ringProgress"/>
+      </svg>
+      <div class="upload-icon"><i data-lucide="upload" width="28" height="28"></i></div>
+    </div>
+    <div class="waveform">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <h3 class="mt-3" data-i18n="upload.dropzone.title">Arrastra tu audio aquí</h3>
+    <p class="text-muted mb-3" data-i18n="upload.dropzone.formats">mp3 · wav · m4a · ogg · flac · hasta 200 MB</p>
+
+    <div class="lang-picker mb-3" onclick="event.stopPropagation()">
+      <span class="lang-picker-label" data-i18n="upload.lang.label">Idioma del audio</span>
+      <div class="lang-picker-btns">
+        <button class="lang-opt active" data-audio-lang="auto" data-i18n="upload.lang.auto">Detección automática</button>
+        <button class="lang-opt" data-audio-lang="es" data-i18n="upload.lang.es">Español</button>
+        <button class="lang-opt" data-audio-lang="en" data-i18n="upload.lang.en">Inglés</button>
+      </div>
+    </div>
+
+    <button class="btn btn-primary-gradient btn-lg magnetic ripple" id="selectBtn">
+      <i data-lucide="file-audio"></i> <span data-i18n="upload.dropzone.button">Seleccionar archivo</span>
+    </button>
+  </div>
+
+  <!-- Status card -->
+  <div class="glass-card status-card mt-4 hidden" id="uploadCard">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="file-icon-wrap"><i data-lucide="music-2"></i></div>
+        <div>
+          <div class="fw-semibold" id="uploadFileName">audio.mp3</div>
+          <small class="text-muted" id="statusText">…</small>
+        </div>
+      </div>
+      <div class="spinner-border spinner-border-sm text-accent" id="uploadSpinner" role="status"></div>
+    </div>
+    <div class="stage-track">
+      <div class="stage-steps" id="stageSteps">
+        <div class="stage-step" data-stage="transcription"><div class="stage-dot"></div><div class="stage-lbl" data-i18n="stage.transcription">Transcripción</div></div>
+        <div class="stage-step" data-stage="diarization"><div class="stage-dot"></div><div class="stage-lbl" data-i18n="stage.diarization">Hablantes</div></div>
+        <div class="stage-step" data-stage="llm_analysis"><div class="stage-dot"></div><div class="stage-lbl" data-i18n="stage.llm_analysis">Análisis IA</div></div>
+        <div class="stage-step" data-stage="embeddings"><div class="stage-dot"></div><div class="stage-lbl" data-i18n="stage.embeddings">Indexado</div></div>
+        <div class="stage-step" data-stage="done"><div class="stage-dot"></div><div class="stage-lbl" data-i18n="stage.done">Completo</div></div>
+      </div>
+      <div class="prog-bar-wrap"><div class="prog-bar" id="progressBar"></div></div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="row g-3 mt-5 feature-grid">
+    <div class="col-md-6 col-lg-3 reveal"><div class="feature-card tilt">
+      <div class="feat-icon amber"><i data-lucide="mic"></i></div>
+      <h5 data-i18n="features.whisper.title">Whisper local</h5>
+      <p data-i18n="features.whisper.desc">faster-whisper en CPU con VAD y timestamps para transcribir sin límites de privacidad.</p>
+    </div></div>
+    <div class="col-md-6 col-lg-3 reveal"><div class="feature-card tilt">
+      <div class="feat-icon coral"><i data-lucide="users"></i></div>
+      <h5 data-i18n="features.diar.title">Diarización</h5>
+      <p data-i18n="features.diar.desc">Identificación automática de hablantes con embeddings de voz y clustering aglomerativo.</p>
+    </div></div>
+    <div class="col-md-6 col-lg-3 reveal"><div class="feature-card tilt">
+      <div class="feat-icon emerald"><i data-lucide="brain"></i></div>
+      <h5 data-i18n="features.llm.title">LLM local</h5>
+      <p data-i18n="features.llm.desc">Llama 3, Mistral o Qwen vía Ollama — 14+ extracciones estructuradas sin internet.</p>
+    </div></div>
+    <div class="col-md-6 col-lg-3 reveal"><div class="feature-card tilt">
+      <div class="feat-icon sky"><i data-lucide="search"></i></div>
+      <h5 data-i18n="features.rag.title">Búsqueda RAG</h5>
+      <p data-i18n="features.rag.desc">Embeddings multilingües indexados en Chroma para recuperación semántica precisa.</p>
+    </div></div>
+  </div>
+
+  <!-- Big Data -->
+  <div class="big-data-section mt-4 reveal">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-5">
+        <div class="section-label" data-i18n="bigdata.label">Arquitectura</div>
+        <h2 class="section-title">
+          <span data-i18n="bigdata.title.pre">Big Data</span>
+          <span class="italic-serif" data-i18n="bigdata.title.italic">Medallion</span><br>
+          <span data-i18n="bigdata.title.post">en tu máquina</span>
+        </h2>
+        <p class="text-muted" data-i18n="bigdata.desc">Capas Bronze, Silver y Gold inmutables.</p>
+      </div>
+      <div class="col-lg-7">
+        <div class="medallion-diagram">
+          <div class="med-layer bronze"><div class="med-name">Bronze</div><div class="med-desc" data-i18n="bigdata.bronze.desc">Audios crudos</div></div>
+          <div class="med-arrow">→</div>
+          <div class="med-layer silver"><div class="med-name">Silver</div><div class="med-desc" data-i18n="bigdata.silver.desc">Transcripciones</div></div>
+          <div class="med-arrow">→</div>
+          <div class="med-layer gold"><div class="med-name">Gold</div><div class="med-desc" data-i18n="bigdata.gold.desc">Analysis estructurado</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONVERSATIONS ============ -->
+<section class="page" id="page-conversations">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <div class="section-label" data-i18n="conv.label">Tus audios</div>
+      <h1 class="page-title" data-i18n="conv.title">Conversaciones</h1>
+    </div>
+    <button class="btn btn-outline-accent magnetic ripple" id="refreshBtn">
+      <i data-lucide="refresh-cw" class="nav-icon"></i> <span data-i18n="conv.refresh">Actualizar</span>
+    </button>
+  </div>
+  <div id="audioList"></div>
+</section>
+
+<!-- ============ DETAIL ============ -->
+<section class="page" id="page-detail">
+  <nav class="breadcrumb-nav mb-3">
+    <button class="btn-link-custom" onclick="showPage('conversations')"><i data-lucide="arrow-left" class="nav-icon"></i> <span data-i18n="detail.back">Conversaciones</span></button>
+    <span class="sep">/</span>
+    <span class="current" id="detailTitle">Análisis</span>
+  </nav>
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="page-title mb-0" id="detailHeader" data-i18n="detail.title">Análisis completo</h1>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-accent btn-sm magnetic ripple" id="exportJsonBtn"><i data-lucide="file-json-2" class="nav-icon"></i> JSON</button>
+      <button class="btn btn-outline-accent btn-sm magnetic ripple" id="exportPdfBtn"><i data-lucide="file-text" class="nav-icon"></i> PDF</button>
+    </div>
+  </div>
+
+  <ul class="nav-tabs-custom" id="detailTabs">
+    <li><button class="tab-btn active" data-tab="summary"><i data-lucide="sparkles" class="nav-icon"></i> <span data-i18n="tab.summary">Resumen</span></button></li>
+    <li><button class="tab-btn" data-tab="transcript"><i data-lucide="align-left" class="nav-icon"></i> <span data-i18n="tab.transcript">Transcripción</span></button></li>
+    <li><button class="tab-btn" data-tab="entities"><i data-lucide="tags" class="nav-icon"></i> <span data-i18n="tab.entities">Entidades</span></button></li>
+    <li><button class="tab-btn" data-tab="tasks"><i data-lucide="check-circle-2" class="nav-icon"></i> <span data-i18n="tab.tasks">Tareas</span></button></li>
+    <li><button class="tab-btn" data-tab="sentiment"><i data-lucide="activity" class="nav-icon"></i> <span data-i18n="tab.sentiment">Sentimiento</span></button></li>
+    <li><button class="tab-btn" data-tab="topics"><i data-lucide="layers" class="nav-icon"></i> <span data-i18n="tab.topics">Temas</span></button></li>
+    <li><button class="tab-btn" data-tab="timeline"><i data-lucide="clock" class="nav-icon"></i> <span data-i18n="tab.timeline">Timeline</span></button></li>
+    <li><button class="tab-btn" data-tab="metrics"><i data-lucide="gauge" class="nav-icon"></i> <span data-i18n="tab.metrics">Métricas</span></button></li>
+    <li><button class="tab-btn" data-tab="related"><i data-lucide="share-2" class="nav-icon"></i> <span data-i18n="tab.related">Relacionados</span></button></li>
+  </ul>
+
+  <div class="tab-panel active" data-tab="summary">
+    <div class="summary-hero glass-card">
+      <div class="small-label" data-i18n="summary.tldr">TL;DR</div>
+      <p class="summary-tldr italic-serif mb-0" id="summaryShort">–</p>
+    </div>
+    <div class="row g-3 mt-2">
+      <div class="col-md-6"><div class="glass-card h-100"><div class="small-label" data-i18n="summary.medium">Resumen ejecutivo</div><div class="mt-2" id="summaryMedium"></div></div></div>
+      <div class="col-md-6"><div class="glass-card h-100"><div class="small-label" data-i18n="summary.long">Resumen completo</div><div class="mt-2 prose" id="summaryLong"></div></div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-tab="transcript">
+    <div class="d-flex gap-2 mb-3 align-items-center">
+      <div class="search-wrap flex-grow-1">
+        <i data-lucide="search" class="search-icon-abs"></i>
+        <input id="transcriptSearch" class="search-input-field" data-i18n-placeholder="transcript.search" placeholder="Buscar en la transcripción…" />
+      </div>
+      <span class="text-muted small" id="transcriptCount"></span>
+    </div>
+    <div id="segmentsList" class="segments-list"></div>
+  </div>
+
+  <div class="tab-panel" data-tab="entities">
+    <div id="entitiesBlock" class="row g-3"></div>
+  </div>
+
+  <div class="tab-panel" data-tab="tasks">
+    <div class="row g-3">
+      <div class="col-md-4"><div class="glass-card h-100"><h5 class="col-title"><span class="col-badge amber"><i data-lucide="check" class="nav-icon"></i></span> <span data-i18n="tasks.title">Tareas</span></h5><div id="tasksList"></div></div></div>
+      <div class="col-md-4"><div class="glass-card h-100"><h5 class="col-title"><span class="col-badge emerald"><i data-lucide="check-circle" class="nav-icon"></i></span> <span data-i18n="decisions.title">Decisiones</span></h5><div id="decisionsList"></div></div></div>
+      <div class="col-md-4"><div class="glass-card h-100"><h5 class="col-title"><span class="col-badge purple"><i data-lucide="help-circle" class="nav-icon"></i></span> <span data-i18n="questions.title">Preguntas</span></h5><div id="questionsList"></div></div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-tab="sentiment">
+    <div class="row g-3 mb-3">
+      <div class="col-md-7"><div class="glass-card"><div class="chart-title" data-i18n="sentiment.evo">Evolución temporal</div><canvas id="sentimentEvolutionChart"></canvas></div></div>
+      <div class="col-md-5"><div class="glass-card"><div class="chart-title" data-i18n="sentiment.speaker">Por hablante</div><canvas id="sentimentSpeakerChart"></canvas></div></div>
+    </div>
+    <div id="conflictsBlock"></div>
+  </div>
+
+  <div class="tab-panel" data-tab="topics">
+    <div class="row g-3">
+      <div class="col-md-7"><div class="glass-card"><h5 data-i18n="topics.main">Temas principales</h5><div id="topicsList" class="mt-3"></div></div></div>
+      <div class="col-md-5"><div class="glass-card"><h5 data-i18n="topics.intents">Intenciones</h5><div id="intentsList" class="mt-3"></div></div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-tab="timeline">
+    <div class="glass-card"><div id="timelineList" class="timeline-list"></div></div>
+  </div>
+
+  <div class="tab-panel" data-tab="metrics">
+    <div class="row g-3">
+      <div class="col-md-6"><div class="glass-card"><div class="chart-title" data-i18n="metrics.participation">Participación por hablante</div><canvas id="participationChart"></canvas></div></div>
+      <div class="col-md-6"><div class="glass-card"><div class="chart-title" data-i18n="metrics.stats">Estadísticas</div><div id="metricsStats" class="mt-2"></div></div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-tab="related">
+    <div id="relatedList"></div>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section class="page" id="page-dashboard">
+  <div class="mb-4">
+    <div class="section-label" data-i18n="dashboard.label">Analítica global</div>
+    <h1 class="page-title" data-i18n="dashboard.title">Dashboard</h1>
+  </div>
+  <div class="row g-3" id="kpiRow"></div>
+  <div class="row g-3 mt-2">
+    <div class="col-lg-6 reveal"><div class="glass-card"><div class="chart-title" data-i18n="dashboard.chart.sentiment">Distribución de sentimiento</div><canvas id="globalSentimentChart"></canvas></div></div>
+    <div class="col-lg-6 reveal"><div class="glass-card"><div class="chart-title" data-i18n="dashboard.chart.totals">Totales extraídos</div><canvas id="totalsChart"></canvas></div></div>
+  </div>
+</section>
+
+<!-- ============ CHAT ============ -->
+<section class="page" id="page-chat">
+  <div class="mb-4">
+    <div class="section-label" data-i18n="chat.label">RAG local</div>
+    <h1 class="page-title" data-i18n="chat.title">Asistente sobre tus audios</h1>
+    <p class="text-muted" data-i18n="chat.sub">Respuestas ancladas exclusivamente en tus transcripciones.</p>
+  </div>
+  <div class="glass-card chat-container">
+    <div class="chat-log" id="chatLog">
+      <div class="chat-welcome">
+        <div class="welcome-icon"><i data-lucide="sparkles"></i></div>
+        <h4><span data-i18n="chat.welcome.hi">Hola, soy</span> <span class="italic-serif accent-grad animated-grad">Audial</span></h4>
+        <p class="text-muted" data-i18n="chat.welcome.desc">Pregúntame sobre tus audios.</p>
+        <div class="suggestions mt-3">
+          <button class="suggestion-chip ripple" onclick="useSuggestion(this)" data-i18n="chat.sugg.1">¿Cuáles fueron las decisiones clave?</button>
+          <button class="suggestion-chip ripple" onclick="useSuggestion(this)" data-i18n="chat.sugg.2">Resume la conversación en 3 puntos</button>
+          <button class="suggestion-chip ripple" onclick="useSuggestion(this)" data-i18n="chat.sugg.3">¿Qué tareas quedaron pendientes?</button>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <select id="chatAudio" class="form-select form-select-sm chat-select mb-2">
+        <option value="" data-i18n="chat.all">Todas las conversaciones</option>
+      </select>
+      <form id="chatForm" class="d-flex gap-2">
+        <input id="chatInput" class="form-control chat-input" data-i18n-placeholder="chat.placeholder" placeholder="Escribe tu pregunta…" autocomplete="off" required />
+        <button class="btn-send magnetic" type="submit"><i data-lucide="send-horizonal"></i></button>
+      </form>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container-xl text-center text-muted">
+    <small data-i18n="footer">Audial · Plataforma IA Conversacional · TFM 2026</small>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/js/config.js"></script>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/app.js"></script>
+
+</body>
+</html>

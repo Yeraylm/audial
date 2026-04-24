@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+*.egg
+
+# Data (runtime — never commit audio files or DBs)
+data/audios/*
+data/transcripts/*
+data/exports/*
+data/embeddings/*
+data/bronze/*
+data/gold/*
+data/*.db
+data/*.sqlite
+!data/.gitkeep
+
+# Generated docs (too large for git)
+docs/*.docx
+docs/*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+node_modules/
+
+# Pytest / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
