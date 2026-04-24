@@ -1,3 +1,13 @@
+---
+title: Audial Backend
+emoji: 🎙
+colorFrom: orange
+colorTo: red
+sdk: docker
+pinned: false
+app_port: 7860
+---
+
 # Audial — Plataforma IA Conversacional
 
 > Transcribe, analiza y extrae conocimiento de tus audios con IA 100% local.
