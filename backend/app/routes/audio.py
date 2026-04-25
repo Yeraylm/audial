@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -18,7 +19,18 @@ ALLOWED_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
 
 
 def _session_id(request: Request) -> str:
-    return request.headers.get("X-Session-ID", "")
+    return request.headers.get("X-Session-ID", "") or ""
+
+
+def _job_status_str(job) -> str:
+    """Convierte JobStatus (enum o str) a string limpio."""
+    if job is None:
+        return "unknown"
+    s = job.status
+    if isinstance(s, JobStatus):
+        return s.value
+    # SQLite a veces devuelve el string directamente
+    return str(s).split(".")[-1].lower()
 
 
 @router.post("/upload", response_model=JobOut)
@@ -26,27 +38,23 @@ async def upload_audio(
     request: Request,
     background: BackgroundTasks,
     file: UploadFile = File(...),
-    language: str | None = Form(None),      # idioma del AUDIO para Whisper (es/en/None=auto)
-    ui_language: str | None = Form("es"),   # idioma de la UI para el output del LLM
+    language: str | None = Form(None),
+    ui_language: str | None = Form("es"),
     db: Session = Depends(get_db),
 ):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"Extension '{ext}' no soportada. Usa: {ALLOWED_EXT}")
 
-    session_id = _session_id(request)
-    output_lang = (ui_language or "es").lower()[:2]  # 'es' | 'en'
+    session_id  = _session_id(request)
+    output_lang = (ui_language or "es").lower()[:2]
 
     audio = Audio(
         filename=file.filename or "audio",
-        filepath="",
-        mime_type=file.content_type or "audio/mpeg",
-        session_id=session_id,
-        ui_language=output_lang,
+        filepath="", mime_type=file.content_type or "audio/mpeg",
+        session_id=session_id, ui_language=output_lang,
     )
-    db.add(audio)
-    db.commit()
-    db.refresh(audio)
+    db.add(audio); db.commit(); db.refresh(audio)
 
     dest = settings.audio_dir / f"{audio.id}{ext}"
     with dest.open("wb") as out:
@@ -56,9 +64,7 @@ async def upload_audio(
     db.commit()
 
     job = Job(audio_id=audio.id, status=JobStatus.PENDING, stage="queued", message="En cola")
-    db.add(job)
-    db.commit()
-    db.refresh(job)
+    db.add(job); db.commit(); db.refresh(job)
 
     whisper_lang = None if not language or language == "auto" else language
     background.add_task(process_single_audio, audio.id, True, whisper_lang, output_lang)
@@ -67,29 +73,37 @@ async def upload_audio(
 
 @router.get("/", response_model=list[dict])
 def list_audios(request: Request, db: Session = Depends(get_db)):
-    session_id = _session_id(request)
-    q = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500)
-    if session_id:
-        q = q.filter(Audio.session_id == session_id)
-    audios = q.all()
+    try:
+        session_id = _session_id(request)
+        q = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500)
+        if session_id:
+            q = q.filter(Audio.session_id == session_id)
+        audios = q.all()
 
-    result = []
-    for a in audios:
-        latest_job = (
-            db.query(Job).filter(Job.audio_id == a.id).order_by(Job.id.desc()).first()
-        )
-        result.append({
-            "id": a.id,
-            "filename": a.filename,
-            "size_bytes": a.size_bytes,
-            "duration_sec": a.duration_sec,
-            "mime_type": a.mime_type,
-            "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
-            "job_status":  latest_job.status.value if latest_job else "unknown",
-            "job_stage":   latest_job.stage         if latest_job else "",
-            "job_message": latest_job.message       if latest_job else "",
-        })
-    return result
+        result = []
+        for a in audios:
+            try:
+                latest_job = (
+                    db.query(Job).filter(Job.audio_id == a.id)
+                    .order_by(Job.id.desc()).first()
+                )
+                result.append({
+                    "id":          a.id,
+                    "filename":    a.filename,
+                    "size_bytes":  a.size_bytes or 0,
+                    "duration_sec":a.duration_sec or 0.0,
+                    "mime_type":   a.mime_type or "audio/mpeg",
+                    "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+                    "job_status":  _job_status_str(latest_job),
+                    "job_stage":   latest_job.stage   if latest_job else "",
+                    "job_message": latest_job.message if latest_job else "",
+                })
+            except Exception as e:
+                logger.warning(f"Error serializando audio {getattr(a, 'id', '?')}: {e}")
+        return result
+    except Exception as e:
+        logger.exception("Error en list_audios")
+        raise HTTPException(500, f"Error listando audios: {e}")
 
 
 @router.get("/{audio_id}", response_model=AudioOut)
@@ -122,6 +136,5 @@ def delete_audio(audio_id: str, request: Request, db: Session = Depends(get_db))
         Path(a.filepath).unlink(missing_ok=True)
     except Exception:
         pass
-    db.delete(a)
-    db.commit()
+    db.delete(a); db.commit()
     return {"deleted": audio_id}

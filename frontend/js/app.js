@@ -202,13 +202,47 @@ $$('[data-audio-lang]').forEach(btn => {
   });
 });
 
-// Re-translate suggestions when language changes
+// Re-render everything when language changes
 window.addEventListener('langchange', () => {
   i18n.applyTranslations();
   refreshIcons();
-  // Refresh chat placeholder, audio list labels etc.
-  const chatInput = $('#chatInput');
-  if (chatInput) chatInput.placeholder = t('chat.placeholder');
+
+  // Re-render dynamic content on the currently visible page
+  const activePage = document.querySelector('.page.active');
+  const pageId = activePage?.id || '';
+
+  if (pageId === 'page-conversations') {
+    refreshAudios();
+  } else if (pageId === 'page-dashboard') {
+    refreshDashboard();
+  } else if (pageId === 'page-detail' && currentAudioId) {
+    // Re-render only the static labels of the active tab (data comes from backend, not i18n)
+    // Re-render tasks/decisions/questions labels and static strings
+    $$('.col-title [data-i18n]').forEach(el => {
+      const v = t(el.dataset.i18n); if (v) el.textContent = v;
+    });
+    // Refresh tab labels
+    $$('.tab-btn [data-i18n]').forEach(el => {
+      const v = t(el.dataset.i18n); if (v) el.textContent = v;
+    });
+    // Refresh metrics labels if metrics panel visible
+    const metricsPanel = $('.tab-panel[data-tab="metrics"]');
+    if (metricsPanel?.classList.contains('active')) {
+      const a = window._lastAnalysis;
+      if (a) safe(() => renderMetrics(a.metrics));
+    }
+    // Refresh transcript count label
+    const cnt = $('#transcriptCount');
+    if (cnt) {
+      const n = $$('.segment-row').length;
+      if (n) cnt.textContent = `${n} ${t('transcript.count')}`;
+    }
+  } else if (pageId === 'page-chat') {
+    const chatInput = $('#chatInput');
+    if (chatInput) chatInput.placeholder = t('chat.placeholder');
+    const sel = $('#chatAudio');
+    if (sel && sel.options[0]) sel.options[0].text = t('chat.all');
+  }
 });
 
 /* ============================================================
@@ -472,6 +506,8 @@ window.openAudio = async function(id) {
   const [a, tr] = await Promise.all([aRes.json(), tRes.json()]);
   if (titleEl)  titleEl.textContent  = a.summary_short?.slice(0,50) + (a.summary_short?.length > 50 ? '…' : '') || id.slice(0,8);
   if (headerEl) headerEl.textContent = t('detail.title');
+
+  window._lastAnalysis = a; // cache for lang re-render
 
   safe(() => renderSummary(a));
   safe(() => renderTranscript(tr));
