@@ -9,6 +9,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -55,37 +56,49 @@ def _new_token() -> str:
 
 @router.post("/register", response_model=dict)
 def register(body: RegisterIn, db: Session = Depends(get_db)):
-    email = body.email.strip().lower()
-    if not email or "@" not in email:
-        raise HTTPException(400, "Email inválido")
-    if len(body.password) < 6:
-        raise HTTPException(400, "La contraseña debe tener al menos 6 caracteres")
-    if db.query(User).filter(User.email == email).first():
-        raise HTTPException(400, "Ya existe una cuenta con ese email")
+    try:
+        email = (body.email or "").strip().lower()
+        if not email or "@" not in email:
+            raise HTTPException(400, "Email inválido")
+        if len(body.password or "") < 6:
+            raise HTTPException(400, "La contraseña debe tener al menos 6 caracteres")
 
-    ver_token = _new_token()
-    user = User(
-        email=email,
-        display_name=body.display_name or email.split("@")[0],
-        hashed_password=hash_password(body.password),
-        is_verified=0,
-        verification_token=ver_token,
-    )
-    db.add(user); db.commit(); db.refresh(user)
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
+            raise HTTPException(400, "Ya existe una cuenta con ese email")
 
-    # Enviar email de verificación (si falla, la cuenta queda sin verificar pero existe)
-    email_sent = send_verification_email(email, ver_token, user.display_name)
+        ver_token = _new_token()
+        user = User(
+            email=email,
+            display_name=(body.display_name or "").strip() or email.split("@")[0],
+            hashed_password=hash_password(body.password),
+            is_verified=0,
+            verification_token=ver_token,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
-    return {
-        "message": "Cuenta creada. Revisa tu email para verificarla.",
-        "email_sent": email_sent,
-        "user_id": user.id,
-        # Si no hay email configurado, devolvemos token de acceso inmediato
-        "token": create_token(user.id, user.email) if not email_sent else None,
-        "email": user.email,
-        "display_name": user.display_name,
-        "is_verified": bool(user.is_verified),
-    }
+        email_sent = False
+        try:
+            email_sent = send_verification_email(email, ver_token, user.display_name)
+        except Exception as email_err:
+            logger.warning(f"Email no enviado: {email_err}")
+
+        return {
+            "message": "Cuenta creada.",
+            "email_sent": email_sent,
+            "user_id": user.id,
+            "token": create_token(user.id, user.email) if not email_sent else None,
+            "email": user.email,
+            "display_name": user.display_name,
+            "is_verified": False,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error en register: {e}")
+        raise HTTPException(500, f"Error interno al registrar: {str(e)}")
 
 
 @router.get("/verify/{token}")

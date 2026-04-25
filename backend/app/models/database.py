@@ -44,7 +44,7 @@ class User(Base):
     email:               Mapped[str]          = mapped_column(String(256), unique=True)
     display_name:        Mapped[str]          = mapped_column(String(128), default="")
     hashed_password:     Mapped[str]          = mapped_column(String(256))
-    is_verified:         Mapped[bool]         = mapped_column(Integer, default=0)   # 0=no, 1=sí
+    is_verified:         Mapped[int]          = mapped_column(Integer, default=0)   # 0=no, 1=sí
     verification_token:  Mapped[str|None]     = mapped_column(String(128), nullable=True)
     reset_token:         Mapped[str|None]     = mapped_column(String(128), nullable=True)
     reset_token_exp:     Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)
