@@ -13,7 +13,7 @@ from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.models.database import User, get_db
+from app.models.database import ROLE_USER, User, get_db
 from app.services.auth_service import (
     create_token, get_current_user,
     hash_password, verify_password,
@@ -38,6 +38,7 @@ class TokenOut(BaseModel):
     email: str
     display_name: str
     is_verified: bool = False
+    role: str = "user"
 
 class ForgotIn(BaseModel):
     email: str
@@ -84,7 +85,8 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
             display_name=(body.display_name or "").strip() or email.split("@")[0],
             hashed_password=hash_password(body.password),
             is_verified=0,
-            verification_token=code,   # reutilizamos el campo para guardar el código
+            role_id=ROLE_USER,         # rol por defecto: usuario
+            verification_token=code,
         )
         db.add(user)
         db.commit()
@@ -172,6 +174,7 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
         user_id=user.id, email=user.email,
         display_name=user.display_name,
         is_verified=bool(user.is_verified),
+        role=user.role_name,
     )
 
 
@@ -238,9 +241,10 @@ def google_login(body: GoogleIn, db: Session = Depends(get_db)):
 @router.get("/me")
 def me(user: User | None = Depends(get_current_user)):
     if not user:
-        return {"authenticated": False}
+        return {"authenticated": False, "role": "guest"}
     return {
         "authenticated": True, "user_id": user.id,
         "email": user.email, "display_name": user.display_name,
         "is_verified": bool(user.is_verified),
+        "role": user.role_name,
     }

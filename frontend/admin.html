@@ -6,7 +6,7 @@
   <title>Audial · Admin BD</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2339FF14'/><text x='6' y='22' font-size='18' font-weight='900' fill='%23050a05'>DB</text></svg>"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
-  <link rel="stylesheet" href="/css/admin.css"/>
+  <link rel="stylesheet" href="/css/admin.css?v=2"/>
 </head>
 <body>
 
@@ -15,54 +15,99 @@
   <div class="login-card">
     <div class="login-logo">🗄️</div>
     <h1>Audial Admin</h1>
-    <p>Panel de administración de base de datos</p>
+    <p>Panel de administración · Solo admins y propietarios</p>
+
+    <div class="login-tabs">
+      <button class="ltab active" id="ltabUser" onclick="switchLoginTab('user')">Email + contraseña</button>
+      <button class="ltab" id="ltabSecret" onclick="switchLoginTab('secret')">Clave de emergencia</button>
+    </div>
+
     <div class="login-error hidden" id="loginErr"></div>
-    <input type="password" id="adminSecret" class="adm-input" placeholder="Clave de administrador" autocomplete="current-password"/>
-    <button class="adm-btn-primary w-100 mt-3" onclick="doAdminLogin()">Acceder</button>
-    <p class="hint">La clave se configura con la variable <code>ADMIN_SECRET</code></p>
+
+    <!-- Email+password tab -->
+    <div id="loginUser">
+      <input type="email" id="adminEmail" class="adm-input" placeholder="Email de tu cuenta admin" autocomplete="email"/>
+      <input type="password" id="adminPass" class="adm-input mt-2" placeholder="Contraseña" autocomplete="current-password"/>
+    </div>
+
+    <!-- Secret tab -->
+    <div id="loginSecret" class="hidden">
+      <input type="password" id="adminSecret" class="adm-input" placeholder="ADMIN_SECRET del servidor"/>
+      <p class="hint">Variable de entorno <code>ADMIN_SECRET</code> del servidor</p>
+    </div>
+
+    <button class="adm-btn-primary w-100 mt-3" onclick="doAdminLogin()">Acceder al panel</button>
+    <p class="hint mt-3">Solo usuarios con rol <b>owner</b> o <b>admin</b> pueden acceder</p>
   </div>
 </div>
 
 <!-- Main panel -->
 <div id="adminPanel" class="admin-layout hidden">
 
-  <!-- Sidebar -->
   <aside class="adm-sidebar">
     <div class="adm-brand">
       <span class="adm-brand-icon">🗄️</span>
       <div>
         <div class="adm-brand-name">Admin BD</div>
-        <div class="adm-brand-sub" id="sidebarDbUrl">SQLite local</div>
+        <div class="adm-brand-sub" id="sidebarInfo">–</div>
       </div>
     </div>
 
-    <div class="adm-section-label">Tablas</div>
+    <div class="adm-section-label">Vistas rápidas</div>
+    <button class="adm-table-btn active" onclick="loadOverview()">📊 Resumen</button>
+    <button class="adm-table-btn" onclick="showUsersView()">👥 Usuarios y roles</button>
+    <button class="adm-table-btn" onclick="showSqlEditor()">⌨ Editor SQL</button>
+
+    <div class="adm-section-label mt-2">Tablas</div>
     <div id="tableList" class="adm-table-list"></div>
 
     <div class="adm-spacer"></div>
-    <button class="adm-sql-btn" onclick="showSqlEditor()">⌨ Editor SQL</button>
     <button class="adm-logout-btn" onclick="doLogout()">✕ Cerrar sesión</button>
   </aside>
 
-  <!-- Content -->
   <main class="adm-content">
 
     <!-- Overview -->
     <div id="viewOverview" class="adm-view active">
       <div class="adm-page-title">
-        <h2>Resumen del sistema</h2>
+        <h2>📊 Resumen del sistema</h2>
         <button class="adm-btn-sm" onclick="loadOverview()">↻ Actualizar</button>
       </div>
       <div id="statsGrid" class="stats-grid"></div>
-
-      <h3 class="mt-4 mb-3" style="font-size:16px;font-weight:700">Acciones rápidas</h3>
+      <h3 class="mt-4 mb-3" style="font-size:15px;font-weight:700">Acciones rápidas</h3>
       <div class="quick-actions">
-        <button class="quick-card" onclick="showTable('users')">👤 Gestionar usuarios</button>
+        <button class="quick-card" onclick="showUsersView()">👥 Gestionar usuarios</button>
         <button class="quick-card" onclick="showTable('audios')">🎙 Ver audios</button>
         <button class="quick-card" onclick="showTable('analyses')">🧠 Ver análisis</button>
         <button class="quick-card" onclick="showTable('jobs')">⚙️ Ver jobs</button>
         <button class="quick-card" onclick="showSqlEditor()">⌨ SQL libre</button>
-        <button class="quick-card danger" onclick="confirmDeleteGuest()">🗑 Limpiar invitados</button>
+        <button class="quick-card danger" onclick="confirmDeleteGuest()">🗑 Limpiar invitados expirados</button>
+      </div>
+    </div>
+
+    <!-- Users + roles -->
+    <div id="viewUsers" class="adm-view">
+      <div class="adm-page-title">
+        <div>
+          <h2>👥 Usuarios y roles</h2>
+          <small class="text-muted">Gestiona roles: owner · admin · user</small>
+        </div>
+        <button class="adm-btn-sm" onclick="loadUsers()">↻ Actualizar</button>
+      </div>
+      <div class="roles-legend mb-3">
+        <span class="role-badge owner">👑 owner</span> Solo puede haber uno · control total
+        &nbsp;&nbsp;
+        <span class="role-badge admin">🔑 admin</span> Acceso al panel de administración
+        &nbsp;&nbsp;
+        <span class="role-badge user">👤 user</span> Usuario estándar (por defecto)
+      </div>
+      <div class="adm-table-wrap">
+        <table class="adm-table">
+          <thead><tr>
+            <th>Email</th><th>Nombre</th><th>Rol actual</th><th>Verificado</th><th>Creado</th><th>Cambiar rol</th><th></th>
+          </tr></thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -73,11 +118,11 @@
           <h2 id="tableViewTitle">tabla</h2>
           <small id="tableViewMeta" class="text-muted"></small>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
           <input id="tableSearch" class="adm-input-sm" placeholder="Buscar…" oninput="filterTable()"/>
-          <button class="adm-btn-sm" id="prevPageBtn" onclick="changePage(-1)">‹ Anterior</button>
+          <button class="adm-btn-sm" id="prevPageBtn" onclick="changePage(-1)">‹</button>
           <span id="pageInfo" class="adm-page-info"></span>
-          <button class="adm-btn-sm" id="nextPageBtn" onclick="changePage(1)">Siguiente ›</button>
+          <button class="adm-btn-sm" id="nextPageBtn" onclick="changePage(1)">›</button>
         </div>
       </div>
       <div class="adm-table-wrap">
@@ -94,22 +139,22 @@
         <h2>⌨ Editor SQL</h2>
         <div class="d-flex gap-2">
           <button class="adm-btn-sm" onclick="clearSql()">Limpiar</button>
-          <button class="adm-btn-primary" onclick="runSql()">▶ Ejecutar</button>
+          <button class="adm-btn-primary" onclick="runSql()">▶ Ejecutar <small style="opacity:.7">(Ctrl+Enter)</small></button>
         </div>
       </div>
       <div class="sql-shortcuts">
-        <button onclick="setSql('SELECT * FROM users LIMIT 50')">usuarios</button>
+        <button onclick="setSql('SELECT u.email, u.display_name, r.name as role FROM users u LEFT JOIN roles r ON u.role_id=r.id ORDER BY u.created_at DESC')">usuarios+roles</button>
         <button onclick="setSql('SELECT * FROM audios ORDER BY uploaded_at DESC LIMIT 50')">audios</button>
         <button onclick="setSql('SELECT * FROM jobs ORDER BY id DESC LIMIT 50')">jobs</button>
-        <button onclick="setSql('SELECT * FROM analyses LIMIT 50')">analyses</button>
-        <button onclick="setSql('DELETE FROM audios WHERE user_id IS NULL AND expires_at < datetime(\'now\')')">limpiar invitados</button>
-        <button onclick="setSql('SELECT COUNT(*) as total, user_id FROM audios GROUP BY user_id')">audios/usuario</button>
+        <button onclick="setSql('SELECT id, audio_id, summary_short FROM analyses LIMIT 20')">análisis</button>
+        <button onclick="setSql('SELECT COUNT(*) total, CASE WHEN user_id IS NULL THEN \'invitado\' ELSE \'registrado\' END tipo FROM audios GROUP BY tipo')">audios por tipo</button>
+        <button onclick="setSql('SELECT * FROM roles')">roles</button>
       </div>
-      <textarea id="sqlEditor" class="sql-editor" placeholder="SELECT * FROM users;" spellcheck="false"></textarea>
+      <textarea id="sqlEditor" class="sql-editor" placeholder="SELECT * FROM users; -- Ctrl+Enter para ejecutar" spellcheck="false"></textarea>
       <div id="sqlResult" class="sql-result hidden"></div>
     </div>
 
-    <!-- Edit modal -->
+    <!-- Edit row modal -->
     <div class="adm-modal-overlay hidden" id="editModal">
       <div class="adm-modal">
         <div class="adm-modal-header">
@@ -128,6 +173,6 @@
   </main>
 </div>
 
-<script src="/js/admin.js?v=1"></script>
+<script src="/js/admin.js?v=2"></script>
 </body>
 </html>

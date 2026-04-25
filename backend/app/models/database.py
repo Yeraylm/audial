@@ -10,7 +10,7 @@ import enum
 import uuid
 from typing import Any
 
-from loguru import logger
+from loguru import logger  # noqa: E402
 from sqlalchemy import (
     JSON, DateTime, Enum, Float, ForeignKey,
     Integer, String, Text, create_engine, text,
@@ -37,6 +37,21 @@ class JobStatus(str, enum.Enum):
     FAILED  = "failed"
 
 
+class Role(Base):
+    """Tabla de roles: owner (1), admin (2), user (3)."""
+    __tablename__ = "roles"
+
+    id:          Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    name:        Mapped[str] = mapped_column(String(32), unique=True)
+    description: Mapped[str] = mapped_column(String(128), default="")
+
+
+# IDs fijos de rol
+ROLE_USER  = 3
+ROLE_ADMIN = 2
+ROLE_OWNER = 1
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -44,13 +59,25 @@ class User(Base):
     email:               Mapped[str]          = mapped_column(String(256), unique=True)
     display_name:        Mapped[str]          = mapped_column(String(128), default="")
     hashed_password:     Mapped[str]          = mapped_column(String(256))
-    is_verified:         Mapped[int]          = mapped_column(Integer, default=0)   # 0=no, 1=sí
+    is_verified:         Mapped[int]          = mapped_column(Integer, default=0)
+    # role_id: 1=owner, 2=admin, 3=user (por defecto)
+    role_id:             Mapped[int]          = mapped_column(Integer, default=ROLE_USER)
     verification_token:  Mapped[str|None]     = mapped_column(String(128), nullable=True)
     reset_token:         Mapped[str|None]     = mapped_column(String(128), nullable=True)
     reset_token_exp:     Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)
     created_at:          Mapped[dt.datetime]  = mapped_column(DateTime, default=dt.datetime.utcnow)
 
-    # Sin relacion ORM directa — filtramos Audio por user_id directamente en las queries
+    @property
+    def role_name(self) -> str:
+        return {ROLE_OWNER: "owner", ROLE_ADMIN: "admin", ROLE_USER: "user"}.get(self.role_id, "user")
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role_id in (ROLE_ADMIN, ROLE_OWNER)
+
+    @property
+    def is_owner(self) -> bool:
+        return self.role_id == ROLE_OWNER
 
 
 class Audio(Base):
@@ -174,6 +201,30 @@ def init_db() -> None:
         _add_column_if_missing(conn, "audios", "ui_language", "VARCHAR(8)  DEFAULT 'es'")
         _add_column_if_missing(conn, "audios", "user_id",     "VARCHAR(64)")
         _add_column_if_missing(conn, "audios", "expires_at",  "DATETIME")
+        _add_column_if_missing(conn, "users",  "role_id",     "INTEGER DEFAULT 3")
+
+    # Seed de roles (idempotente)
+    _seed_roles()
+
+
+def _seed_roles() -> None:
+    db = SessionLocal()
+    try:
+        from app.models.database import Role, ROLE_OWNER, ROLE_ADMIN, ROLE_USER  # noqa: PLC0415
+        roles = [
+            (ROLE_OWNER, "owner", "Propietario — control total, único en el sistema"),
+            (ROLE_ADMIN, "admin", "Administrador — acceso al panel de administración"),
+            (ROLE_USER,  "user",  "Usuario estándar — acceso a funcionalidades de audio"),
+        ]
+        for rid, name, desc in roles:
+            if not db.query(Role).filter(Role.id == rid).first():
+                db.add(Role(id=rid, name=name, description=desc))
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Seed roles: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def get_db():
