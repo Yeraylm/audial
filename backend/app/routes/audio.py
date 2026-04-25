@@ -4,6 +4,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import datetime as dt
+
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse as FastFileResponse
 from loguru import logger
@@ -53,11 +55,15 @@ async def upload_audio(
     session_id  = _session_id(request)
     output_lang = (ui_language or "es").lower()[:2]
 
+    # Audios de invitado expiran en 24 h; los de usuarios registrados son permanentes
+    expires = None if current_user else dt.datetime.utcnow() + dt.timedelta(hours=24)
+
     audio = Audio(
         filename=file.filename or "audio",
         filepath="", mime_type=file.content_type or "audio/mpeg",
         session_id=session_id, ui_language=output_lang,
         user_id=current_user.id if current_user else None,
+        expires_at=expires,
     )
     db.add(audio); db.commit(); db.refresh(audio)
 
@@ -110,6 +116,8 @@ def list_audios(
                     "duration_sec":float(a.duration_sec or 0.0),
                     "mime_type":   str(a.mime_type or "audio/mpeg"),
                     "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+                    "expires_at":  a.expires_at.isoformat() if a.expires_at else None,
+                    "is_guest":    a.user_id is None,
                     "job_status":  _job_status_str(latest_job),
                     "job_stage":   str(latest_job.stage   if latest_job else ""),
                     "job_message": str(latest_job.message if latest_job else ""),

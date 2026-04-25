@@ -1,6 +1,8 @@
 """Punto de entrada FastAPI."""
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -12,11 +14,29 @@ from app.core.config import settings
 from app.models import init_db
 from app.routes import analysis, audio, dashboard, search
 from app.routes import auth as auth_routes
+from app.services.guest_cleanup import run_periodic_cleanup
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    # Tarea de limpieza: cada hora elimina audios de invitado expirados
+    cleanup_task = asyncio.create_task(run_periodic_cleanup(3600))
+    yield
+    # Shutdown
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
 
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
     description="Plataforma IA de análisis de conversaciones de audio.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -34,11 +54,6 @@ app.include_router(search.router)
 app.include_router(dashboard.router)
 
 
-@app.on_event("startup")
-def _startup() -> None:
-    init_db()
-
-
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "app": settings.app_name, "version": "1.0.0"}
@@ -47,9 +62,6 @@ def health() -> dict[str, str]:
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 if FRONTEND_DIR.exists():
-    # Mount CSS, JS and assets at their real sub-paths.
-    # This matches what Netlify serves (frontend/ is the publish dir),
-    # so /css/styles.css works both locally and on Netlify.
     for sub in ("css", "js", "assets"):
         sub_dir = FRONTEND_DIR / sub
         sub_dir.mkdir(exist_ok=True)

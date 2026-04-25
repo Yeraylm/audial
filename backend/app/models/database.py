@@ -66,8 +66,9 @@ class Audio(Base):
     session_id:  Mapped[str]          = mapped_column(String(64), default="")
     ui_language: Mapped[str]          = mapped_column(String(8),  default="es")
     # Auth: si el usuario está logueado, se guarda aquí; si no, se usa session_id
-    # Sin ForeignKey explícita para evitar conflictos de relación ORM — filtramos manualmente
     user_id:     Mapped[str|None]     = mapped_column(String(64), nullable=True)
+    # Invitados: audio temporal con fecha de expiración (24 h). NULL = permanente.
+    expires_at:  Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)
 
     jobs       = relationship("Job",        back_populates="audio", cascade="all, delete")
     transcript = relationship("Transcript", back_populates="audio", uselist=False, cascade="all, delete")
@@ -172,6 +173,7 @@ def init_db() -> None:
         _add_column_if_missing(conn, "audios", "session_id",  "VARCHAR(64) DEFAULT ''")
         _add_column_if_missing(conn, "audios", "ui_language", "VARCHAR(8)  DEFAULT 'es'")
         _add_column_if_missing(conn, "audios", "user_id",     "VARCHAR(64)")
+        _add_column_if_missing(conn, "audios", "expires_at",  "DATETIME")
 
 
 def get_db():

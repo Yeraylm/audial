@@ -434,6 +434,9 @@ async function refreshAudios() {
 
     list.innerHTML = data.map(a => {
       const canOpen = a.job_status === 'done';
+      const guestBadge = a.is_guest
+        ? `<span class="badge-guest" title="Se eliminará automáticamente en 24h">⏱ temporal</span>`
+        : '';
       return `
         <div class="audio-row" onclick="${canOpen ? `openAudio('${a.id}')` : ''}">
           <div class="audio-avatar"><i data-lucide="audio-lines"></i></div>
@@ -442,6 +445,7 @@ async function refreshAudios() {
             <div class="sub">${fmtDur(a.duration_sec)} · ${fmtDate(a.uploaded_at)}</div>
           </div>
           ${getBadge(a.job_status)}
+          ${guestBadge}
           <button class="btn btn-link text-muted p-1 ms-2" onclick="event.stopPropagation();removeAudio('${a.id}')" title="Eliminar">
             <i data-lucide="trash-2" style="width:16px;height:16px"></i>
           </button>
@@ -1143,6 +1147,13 @@ async function translateAndRender(audioId, targetLang) {
 document.addEventListener('DOMContentLoaded', () => {
   refreshIcons();
   _updateUserNav();
+
+  // Auth modal close = continue as guest
+  document.getElementById('authCloseBtn')?.addEventListener('click', _continueAsGuest);
+  document.getElementById('authModal')?.addEventListener('hidden.bs.modal', () => {
+    // If dismissed without logging in, treat as guest
+    if (!_authToken) _continueAsGuest();
+  });
 
   // Auth tabs
   document.getElementById('tabLogin')?.addEventListener('click', () => _switchAuthTab('login'));
