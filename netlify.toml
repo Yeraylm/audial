@@ -1,18 +1,36 @@
-# Netlify — frontend estático de Audial
-# Proxy /api/* directamente al backend en HF Spaces
+# Netlify — Audial frontend
+# Backend en HF Spaces: https://yeray22-audial-backend.hf.space
 
 [build]
   publish = "frontend"
   command = ""
 
-# Proxy de API al backend (evita CORS, una sola URL para el usuario)
+# --- API proxy (orden importa: más específicos primero) ---
+[[redirects]]
+  from   = "/docs"
+  to     = "https://yeray22-audial-backend.hf.space/docs"
+  status = 200
+  force  = true
+
+[[redirects]]
+  from   = "/redoc"
+  to     = "https://yeray22-audial-backend.hf.space/redoc"
+  status = 200
+  force  = true
+
+[[redirects]]
+  from   = "/openapi.json"
+  to     = "https://yeray22-audial-backend.hf.space/openapi.json"
+  status = 200
+  force  = true
+
 [[redirects]]
   from   = "/api/*"
   to     = "https://yeray22-audial-backend.hf.space/api/:splat"
   status = 200
   force  = true
 
-# SPA fallback — siempre sirve index.html para rutas del frontend
+# SPA fallback — siempre al final
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

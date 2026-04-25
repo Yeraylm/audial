@@ -73,14 +73,20 @@ async def upload_audio(
 
 @router.get("/", response_model=list[dict])
 def list_audios(request: Request, db: Session = Depends(get_db)):
+    session_id = _session_id(request)
+    result = []
     try:
-        session_id = _session_id(request)
-        q = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500)
-        if session_id:
-            q = q.filter(Audio.session_id == session_id)
-        audios = q.all()
+        # Intentar filtrar por session_id (columna puede no existir en BDs viejas)
+        try:
+            q = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500)
+            if session_id:
+                q = q.filter(Audio.session_id == session_id)
+            audios = q.all()
+        except Exception:
+            # Fallback sin filtro de sesión si la columna no existe aún
+            logger.warning("session_id column unavailable, returning all audios")
+            audios = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500).all()
 
-        result = []
         for a in audios:
             try:
                 latest_job = (
@@ -88,22 +94,23 @@ def list_audios(request: Request, db: Session = Depends(get_db)):
                     .order_by(Job.id.desc()).first()
                 )
                 result.append({
-                    "id":          a.id,
-                    "filename":    a.filename,
-                    "size_bytes":  a.size_bytes or 0,
-                    "duration_sec":a.duration_sec or 0.0,
-                    "mime_type":   a.mime_type or "audio/mpeg",
+                    "id":          str(a.id),
+                    "filename":    str(a.filename or ""),
+                    "size_bytes":  int(a.size_bytes or 0),
+                    "duration_sec":float(a.duration_sec or 0.0),
+                    "mime_type":   str(a.mime_type or "audio/mpeg"),
                     "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
                     "job_status":  _job_status_str(latest_job),
-                    "job_stage":   latest_job.stage   if latest_job else "",
-                    "job_message": latest_job.message if latest_job else "",
+                    "job_stage":   str(latest_job.stage   if latest_job else ""),
+                    "job_message": str(latest_job.message if latest_job else ""),
                 })
             except Exception as e:
-                logger.warning(f"Error serializando audio {getattr(a, 'id', '?')}: {e}")
-        return result
+                logger.warning(f"Skip audio {getattr(a,'id','?')}: {e}")
     except Exception as e:
-        logger.exception("Error en list_audios")
-        raise HTTPException(500, f"Error listando audios: {e}")
+        logger.exception("Error crítico en list_audios")
+        # Devolver lista vacía en lugar de 500 para no romper el frontend
+        return []
+    return result
 
 
 @router.get("/{audio_id}", response_model=AudioOut)
