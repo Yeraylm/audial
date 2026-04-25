@@ -391,10 +391,10 @@
       </div>
 
       <div class="auth-tabs">
-        <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">
+        <button class="auth-tab active" id="tabLogin">
           <span data-i18n="auth.login">Iniciar sesión</span>
         </button>
-        <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">
+        <button class="auth-tab" id="tabRegister">
           <span data-i18n="auth.register">Crear cuenta</span>
         </button>
       </div>
@@ -412,6 +412,9 @@
         </div>
         <div class="auth-error hidden" id="loginError"></div>
         <button type="submit" class="auth-submit ripple" data-i18n="auth.login.btn">Entrar</button>
+        <div style="text-align:center;margin-top:10px">
+          <a href="#" id="forgotPasswordLink" style="color:var(--tx-3);font-size:12px" data-i18n="auth.forgot">¿Olvidaste tu contraseña?</a>
+        </div>
         <!-- Google login button (appears only if GOOGLE_CLIENT_ID is configured) -->
       <div id="googleBtnWrap" class="google-btn-wrap hidden">
         <div class="auth-divider"><span data-i18n="auth.or">o</span></div>
@@ -436,6 +439,10 @@
           <label data-i18n="auth.password">Contraseña</label>
           <input type="password" id="regPassword" class="auth-input" required placeholder="Mín. 6 caracteres"/>
         </div>
+        <div class="auth-field">
+          <label data-i18n="auth.confirm_password">Confirmar contraseña</label>
+          <input type="password" id="regPasswordConfirm" class="auth-input" required placeholder="Repite la contraseña"/>
+        </div>
         <div class="auth-error hidden" id="registerError"></div>
         <button type="submit" class="auth-submit ripple" id="registerSubmitBtn" data-i18n="auth.register.btn">Crear cuenta</button>
 
@@ -456,10 +463,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- Google Identity Services (solo si GOOGLE_CLIENT_ID está configurado) -->
 <script src="https://accounts.google.com/gsi/client" async></script>
-<!-- ?v=6 busts Netlify CDN cache -->
-<script src="/js/config.js?v=6"></script>
-<script src="/js/i18n.js?v=6"></script>
-<script src="/js/app.js?v=6"></script>
+<!-- ?v=7 busts Netlify CDN cache -->
+<script src="/js/config.js?v=7"></script>
+<script src="/js/i18n.js?v=7"></script>
+<script src="/js/app.js?v=7"></script>
 
 </body>
 </html>

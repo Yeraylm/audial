@@ -934,19 +934,51 @@ async function _doLogin(e) {
 async function _doRegister(e) {
   e?.preventDefault();
   const errEl = $('#registerError');
-  errEl?.classList.add('hidden');
+  if (errEl) errEl.classList.add('hidden');
+
+  const pwd  = $('#regPassword')?.value || '';
+  const pwd2 = $('#regPasswordConfirm')?.value || '';
+  if (pwd !== pwd2) {
+    if (errEl) { errEl.textContent = t('auth.passwords_mismatch'); errEl.classList.remove('hidden'); }
+    return;
+  }
+  if (pwd.length < 6) {
+    if (errEl) { errEl.textContent = t('auth.password_short'); errEl.classList.remove('hidden'); }
+    return;
+  }
+
   try {
     const r = await _fetch(`${API}/api/auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: $('#regEmail')?.value || '', password: $('#regPassword')?.value || '', display_name: $('#regName')?.value || '' }),
+      body: JSON.stringify({
+        email: $('#regEmail')?.value?.trim() || '',
+        password: pwd,
+        display_name: $('#regName')?.value?.trim() || '',
+      }),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Error');
-    _setAuth(data.token, { email: data.email, display_name: data.display_name });
-    _getAuthModal()?.hide();
-    refreshAudios(); refreshDashboard();
+
+    if (data.token) {
+      // Sin email de verificación configurado → login inmediato
+      _setAuth(data.token, { email: data.email, display_name: data.display_name, is_verified: data.is_verified });
+      _getAuthModal()?.hide();
+      refreshAudios(); refreshDashboard();
+    } else {
+      // Email de verificación enviado
+      if (errEl) {
+        errEl.style.background = 'rgba(106,176,76,.1)';
+        errEl.style.borderColor = 'rgba(106,176,76,.3)';
+        errEl.style.color = 'var(--emerald-lt)';
+        errEl.textContent = t('auth.verify_email_sent');
+        errEl.classList.remove('hidden');
+      }
+    }
   } catch (err) {
-    if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+    if (errEl) {
+      errEl.style.background = ''; errEl.style.borderColor = ''; errEl.style.color = '';
+      errEl.textContent = err.message; errEl.classList.remove('hidden');
+    }
   }
 }
 
@@ -974,6 +1006,51 @@ function _toggleUserMenu() {
   } else {
     _getAuthModal()?.show();
   }
+}
+
+// Forgot password
+async function _doForgotPassword() {
+  const email = prompt(t('auth.enter_email'));
+  if (!email) return;
+  await _fetch(`${API}/api/auth/forgot-password`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
+  });
+  alert(t('auth.reset_sent'));
+}
+
+// Reset password from URL token
+async function _handleResetToken(token) {
+  const pwd = prompt(t('auth.new_password_prompt'));
+  if (!pwd || pwd.length < 6) { alert(t('auth.password_short')); return; }
+  const r = await _fetch(`${API}/api/auth/reset-password`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: pwd }),
+  });
+  const data = await r.json();
+  if (r.ok) { alert(t('auth.reset_ok')); }
+  else { alert(data.detail || t('auth.reset_error')); }
+  // Limpiar token de la URL
+  history.replaceState({}, '', '/');
+}
+
+// Handle verified=1&token=... from email verification redirect
+function _handleUrlParams() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('verified') === '1') {
+    const token = params.get('token');
+    if (token) {
+      // Decode basic user info from JWT payload (without verifying signature)
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        _setAuth(token, { email: payload.email || '', display_name: '', is_verified: true });
+        history.replaceState({}, '', '/');
+        refreshAudios(); refreshDashboard();
+      } catch { history.replaceState({}, '', '/'); }
+    }
+  }
+  const resetToken = params.get('reset_token');
+  if (resetToken) _handleResetToken(resetToken);
 }
 
 // Google OAuth callback
@@ -1077,6 +1154,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.google) _initGoogleAuth();
   else document.querySelector('script[src*="accounts.google.com"]')
     ?.addEventListener('load', _initGoogleAuth);
+
+  // Handle URL params (email verification, password reset)
+  _handleUrlParams();
+
+  // Forgot password link
+  document.getElementById('forgotPasswordLink')?.addEventListener('click', e => {
+    e.preventDefault(); _doForgotPassword();
+  });
 
   // Show auth modal if not logged in and not dismissed
   const dismissed = localStorage.getItem('audial_auth_dismissed');

@@ -40,11 +40,15 @@ class JobStatus(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id:              Mapped[str]         = mapped_column(String(64), primary_key=True, default=_uuid)
-    email:           Mapped[str]         = mapped_column(String(256), unique=True)
-    display_name:    Mapped[str]         = mapped_column(String(128), default="")
-    hashed_password: Mapped[str]         = mapped_column(String(256))
-    created_at:      Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+    id:                  Mapped[str]          = mapped_column(String(64), primary_key=True, default=_uuid)
+    email:               Mapped[str]          = mapped_column(String(256), unique=True)
+    display_name:        Mapped[str]          = mapped_column(String(128), default="")
+    hashed_password:     Mapped[str]          = mapped_column(String(256))
+    is_verified:         Mapped[bool]         = mapped_column(Integer, default=0)   # 0=no, 1=sí
+    verification_token:  Mapped[str|None]     = mapped_column(String(128), nullable=True)
+    reset_token:         Mapped[str|None]     = mapped_column(String(128), nullable=True)
+    reset_token_exp:     Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)
+    created_at:          Mapped[dt.datetime]  = mapped_column(DateTime, default=dt.datetime.utcnow)
 
     audios = relationship("Audio", back_populates="owner", cascade="all, delete")
 
