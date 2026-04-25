@@ -640,7 +640,7 @@ function renderSentiment(s, conflicts) {
     type:'line',
     data:{ labels: evo.map((e,i) => `seg ${e.segment??i}`),
       datasets:[{ label:'Sentiment', data: evo.map(e => e.score),
-        borderColor:'#F5A623', backgroundColor:'rgba(245,166,35,.12)', fill:true, tension:.35, pointRadius:3, pointBackgroundColor:'#F5A623' }]},
+        borderColor:'#39FF14', backgroundColor:'rgba(245,166,35,.12)', fill:true, tension:.35, pointRadius:3, pointBackgroundColor:'#39FF14' }]},
     options:{ ...base, scales:{ y:{...base.scales.y,min:-1,max:1}, x:base.scales.x }, plugins:{ legend:{display:false} } }
   });
 
@@ -724,8 +724,8 @@ function renderMetrics(m) {
     charts.part = new Chart(partEl, {
       type:'doughnut',
       data:{ labels:Object.keys(part), datasets:[{ data:Object.values(part),
-        backgroundColor:['#F5A623','#E85A4F','#6AB04C','#4FC3F7','#B084F0','#FFC95A'], borderWidth:2, borderColor:'#0e0c1a' }]},
-      options:{ responsive:true, plugins:{ legend:{ position:'right', labels:{ color:'#AEA290', boxWidth:12, font:{size:11} } } }, cutout:'62%' }
+        backgroundColor:['#39FF14','#00E5CC','#00C853','#4FC3F7','#B084F0','#FFC95A'], borderWidth:2, borderColor:'#0e0c1a' }]},
+      options:{ responsive:true, plugins:{ legend:{ position:'right', labels:{ color:'#8DA88D', boxWidth:12, font:{size:11} } } }, cutout:'62%' }
     });
   }
 }
@@ -752,8 +752,8 @@ function baseOpts() {
   return {
     responsive:true, maintainAspectRatio:false,
     scales:{
-      y:{ grid:{ color:'rgba(255,255,255,.05)' }, ticks:{ color:'#AEA290', font:{size:11} } },
-      x:{ grid:{ color:'rgba(255,255,255,.04)' }, ticks:{ color:'#AEA290', font:{size:11}, maxTicksLimit:8 } }
+      y:{ grid:{ color:'rgba(255,255,255,.05)' }, ticks:{ color:'#8DA88D', font:{size:11} } },
+      x:{ grid:{ color:'rgba(255,255,255,.04)' }, ticks:{ color:'#8DA88D', font:{size:11}, maxTicksLimit:8 } }
     }
   };
 }
@@ -794,8 +794,8 @@ async function refreshDashboard() {
       type:'doughnut',
       data:{ labels:Object.keys(sd).length ? Object.keys(sd) : ['–'], datasets:[{
         data:Object.values(sd).length ? Object.values(sd) : [1],
-        backgroundColor:['#6AB04C','#AEA290','#E85A4F','#F5A623'], borderWidth:2, borderColor:'#0e0c1a' }]},
-      options:{ responsive:true, plugins:{ legend:{ position:'right', labels:{ color:'#AEA290',boxWidth:12,font:{size:11} } } }, cutout:'62%' }
+        backgroundColor:['#00C853','#8DA88D','#00E5CC','#39FF14'], borderWidth:2, borderColor:'#0e0c1a' }]},
+      options:{ responsive:true, plugins:{ legend:{ position:'right', labels:{ color:'#8DA88D',boxWidth:12,font:{size:11} } } }, cutout:'62%' }
     });
 
     destroyChart('tt');
@@ -805,7 +805,7 @@ async function refreshDashboard() {
       type:'bar',
       data:{ labels:['Tareas','Decisiones','Conflictos'], datasets:[{
         data:[tot.tasks??0, tot.decisions??0, tot.conflicts??0],
-        backgroundColor:['#F5A623','#6AB04C','#E85A4F'], borderRadius:8, borderWidth:0 }]},
+        backgroundColor:['#39FF14','#00C853','#00E5CC'], borderRadius:8, borderWidth:0 }]},
       options:{ ...baseOpts(), plugins:{ legend:{display:false} } }
     });
   } catch (e) { console.warn('[Audial] dashboard:', e); }
