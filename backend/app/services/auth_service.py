@@ -77,13 +77,24 @@ def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User | None:
+    """
+    Devuelve el User si el token es válido y el usuario existe.
+    Devuelve None (modo invitado) si:
+      - No hay token
+      - El token es inválido / expirado
+      - El usuario ya no existe en BD (p.ej. tras reset de BD efímera)
+    Nunca lanza 401 — los endpoints deciden si requieren auth.
+    """
     if not creds:
         return None
-    payload = decode_token(creds.credentials)
+    try:
+        payload = decode_token(creds.credentials)
+    except HTTPException:
+        # Token inválido o expirado → degradar a invitado silenciosamente
+        return None
     user = db.query(User).filter(User.id == payload.get("sub")).first()
-    if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuario no encontrado")
-    return user
+    # Si el usuario no existe (BD reseteada, cuenta eliminada) → invitado
+    return user  # puede ser None
 
 
 def require_user(

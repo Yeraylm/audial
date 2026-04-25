@@ -31,15 +31,23 @@ function _updateUserNav() {
   }
 }
 
-// Intercept fetch: add auth header + session ID to all /api calls
+// Intercept fetch: add auth header + session ID; auto-clear token on 401
 const _fetch = window.fetch.bind(window);
-window.fetch = function(url, opts = {}) {
+window.fetch = async function(url, opts = {}) {
   if (typeof url === 'string' && (url.startsWith(API + '/api') || url.startsWith('/api'))) {
     const headers = { ...(opts.headers || {}), 'X-Session-ID': window.AUDIAL_SESSION || '' };
     if (_authToken) headers['Authorization'] = `Bearer ${_authToken}`;
     opts.headers = headers;
   }
-  return _fetch(url, opts);
+  const response = await _fetch(url, opts);
+  // Si el servidor responde 401, el token es inválido (usuario eliminado o BD reseteada)
+  if (response.status === 401 && _authToken) {
+    console.warn('[Audial] Token inválido o usuario no encontrado, limpiando sesión');
+    _setAuth(null, null);
+    // Recargar datos como invitado
+    setTimeout(() => { refreshAudios(); refreshDashboard(); }, 100);
+  }
+  return response;
 };
 
 let currentAudioId = null;
