@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.etl.pipeline import process_single_audio
 from app.models import Audio, Job, JobStatus, get_db
+from app.models.database import User
 from app.models.schemas import AudioOut, JobOut
+from app.services.auth_service import get_current_user
 
 router = APIRouter(prefix="/api/audio", tags=["audio"])
 
@@ -41,6 +43,7 @@ async def upload_audio(
     language: str | None = Form(None),
     ui_language: str | None = Form("es"),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
 ):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_EXT:
@@ -53,6 +56,7 @@ async def upload_audio(
         filename=file.filename or "audio",
         filepath="", mime_type=file.content_type or "audio/mpeg",
         session_id=session_id, ui_language=output_lang,
+        user_id=current_user.id if current_user else None,
     )
     db.add(audio); db.commit(); db.refresh(audio)
 
@@ -72,19 +76,25 @@ async def upload_audio(
 
 
 @router.get("/", response_model=list[dict])
-def list_audios(request: Request, db: Session = Depends(get_db)):
+def list_audios(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
+):
     session_id = _session_id(request)
     result = []
     try:
-        # Intentar filtrar por session_id (columna puede no existir en BDs viejas)
         try:
             q = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500)
-            if session_id:
-                q = q.filter(Audio.session_id == session_id)
+            if current_user:
+                # Usuario autenticado: ver solo SUS audios
+                q = q.filter(Audio.user_id == current_user.id)
+            elif session_id:
+                # Invitado: filtrar por session_id (solo audios sin user_id)
+                q = q.filter(Audio.user_id == None, Audio.session_id == session_id)  # noqa: E711
             audios = q.all()
         except Exception:
-            # Fallback sin filtro de sesión si la columna no existe aún
-            logger.warning("session_id column unavailable, returning all audios")
+            logger.warning("Filtro de usuario falló, devolviendo todos")
             audios = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500).all()
 
         for a in audios:

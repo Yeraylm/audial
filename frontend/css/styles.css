@@ -781,3 +781,111 @@ canvas { max-height:260px !important; }
   .stage-lbl { font-size:9px; }
   .nav-tabs-custom { flex-wrap:nowrap;overflow-x:auto; }
 }
+
+/* ============================================================
+   AUTH MODAL
+   ============================================================ */
+.auth-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 36px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+}
+.auth-brand {
+  display: flex; align-items: center; gap: 10px;
+  justify-content: center; margin-bottom: 28px;
+}
+.auth-brand-name {
+  font-family: 'Fraunces', serif;
+  font-size: 24px; font-weight: 700; color: var(--tx-1);
+}
+.auth-tabs {
+  display: flex; gap: 4px;
+  background: var(--bg-3); border-radius: 999px; padding: 4px;
+  margin-bottom: 24px;
+}
+.auth-tab {
+  flex: 1; background: transparent; border: none;
+  color: var(--tx-2); font-size: 14px; font-weight: 600;
+  padding: 8px 14px; border-radius: 999px; transition: all .2s;
+}
+.auth-tab.active { background: var(--grad-primary); color: white; }
+
+.auth-desc { color: var(--tx-2); font-size: 13px; margin-bottom: 18px; text-align: center; }
+
+.auth-field { margin-bottom: 14px; }
+.auth-field label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--tx-2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em;
+}
+.auth-input {
+  width: 100%; background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--tx-1); padding: 11px 14px; border-radius: 10px; font-size: 14px; outline: none;
+  transition: border-color .2s;
+}
+.auth-input:focus { border-color: var(--amber); background: rgba(245,166,35,.05); }
+
+.auth-error {
+  background: rgba(232,90,79,.12); border: 1px solid rgba(232,90,79,.3);
+  color: var(--coral-lt); font-size: 13px; padding: 10px 14px;
+  border-radius: 8px; margin-bottom: 12px;
+}
+.auth-submit {
+  width: 100%; background: var(--grad-primary); border: none; color: white;
+  padding: 13px; border-radius: 999px; font-size: 15px; font-weight: 700;
+  margin-top: 4px; transition: all .25s;
+  box-shadow: 0 6px 20px rgba(245,166,35,.3);
+}
+.auth-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(245,166,35,.45); }
+.auth-guest {
+  width: 100%; background: transparent; border: none;
+  color: var(--tx-3); font-size: 13px; padding: 10px;
+  margin-top: 8px; transition: color .2s;
+}
+.auth-guest:hover { color: var(--tx-1); }
+
+/* User nav button */
+.user-nav-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-3); border: 1px solid var(--border);
+  color: var(--tx-1); padding: 5px 12px 5px 5px;
+  border-radius: 999px; font-size: 13px; font-weight: 500; transition: all .2s;
+  position: relative;
+}
+.user-nav-btn:hover { border-color: var(--amber); }
+.user-avatar {
+  width: 28px; height: 28px;
+  background: var(--grad-primary); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
+}
+.user-name { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#userNavItem { position: relative; }
+.user-menu {
+  position: absolute; right: 0; top: calc(100% + 8px);
+  background: var(--bg-2); border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 8px; min-width: 180px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.4); z-index: 200;
+}
+.user-menu-email {
+  font-size: 12px; color: var(--tx-3); padding: 6px 10px 10px;
+  border-bottom: 1px solid var(--border); margin-bottom: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.user-menu button {
+  width: 100%; background: transparent; border: none;
+  color: var(--coral-lt); text-align: left;
+  padding: 8px 10px; border-radius: 8px; font-size: 13px; transition: background .15s;
+}
+.user-menu button:hover { background: rgba(232,90,79,.1); }
+
+/* Traduciendo... indicator */
+.translating-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(245,166,35,.1); border: 1px solid rgba(245,166,35,.25);
+  color: var(--amber-lt); font-size: 12px; padding: 4px 12px; border-radius: 999px;
+  margin-bottom: 16px;
+}
+.translating-badge .spinner-border { width: 12px; height: 12px; border-width: 2px; }

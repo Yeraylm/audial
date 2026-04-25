@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.models import init_db
 from app.routes import analysis, audio, dashboard, search
+from app.routes import auth as auth_routes
 
 app = FastAPI(
     title=settings.app_name,
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_credentials=True,
 )
 
+app.include_router(auth_routes.router)
 app.include_router(audio.router)
 app.include_router(analysis.router)
 app.include_router(search.router)

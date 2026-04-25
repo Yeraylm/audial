@@ -60,6 +60,16 @@
             <button data-lang-btn="en" onclick="i18n.setLang('en')">EN</button>
           </div>
         </li>
+        <li class="nav-item ms-lg-1" id="userNavItem">
+          <button class="user-nav-btn" id="userNavBtn" onclick="toggleUserMenu()">
+            <span class="user-avatar" id="userAvatar">?</span>
+            <span class="user-name" id="userNavName" data-i18n="auth.guest.short">Invitado</span>
+          </button>
+          <div class="user-menu hidden" id="userMenu">
+            <div class="user-menu-email" id="userMenuEmail"></div>
+            <button onclick="doLogout()" data-i18n="auth.logout">Cerrar sesión</button>
+          </div>
+        </li>
       </ul>
     </div>
   </div>
@@ -355,6 +365,69 @@
   </div>
 </footer>
 
+<!-- Auth Modal -->
+<div class="modal fade" id="authModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content auth-modal">
+      <div class="auth-brand">
+        <svg viewBox="0 0 28 28" width="28" height="28">
+          <defs><linearGradient id="alg" x1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5A623"/><stop offset="1" stop-color="#E85A4F"/></linearGradient></defs>
+          <path d="M4 18 Q14 4 24 18" stroke="url(#alg)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <circle cx="4" cy="18" r="2.5" fill="url(#alg)"/>
+          <circle cx="24" cy="18" r="2.5" fill="url(#alg)"/>
+        </svg>
+        <span class="auth-brand-name">Audial</span>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">
+          <span data-i18n="auth.login">Iniciar sesión</span>
+        </button>
+        <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">
+          <span data-i18n="auth.register">Crear cuenta</span>
+        </button>
+      </div>
+
+      <!-- Login form -->
+      <form id="loginForm" class="auth-form" onsubmit="doLogin(event)">
+        <p class="auth-desc" data-i18n="auth.login.desc">Accede a tus conversaciones desde cualquier dispositivo.</p>
+        <div class="auth-field">
+          <label data-i18n="auth.email">Email</label>
+          <input type="email" id="loginEmail" class="auth-input" required placeholder="tu@email.com"/>
+        </div>
+        <div class="auth-field">
+          <label data-i18n="auth.password">Contraseña</label>
+          <input type="password" id="loginPassword" class="auth-input" required placeholder="••••••••"/>
+        </div>
+        <div class="auth-error hidden" id="loginError"></div>
+        <button type="submit" class="auth-submit ripple" data-i18n="auth.login.btn">Entrar</button>
+        <button type="button" class="auth-guest" onclick="continueAsGuest()" data-i18n="auth.guest">Continuar como invitado →</button>
+      </form>
+
+      <!-- Register form -->
+      <form id="registerForm" class="auth-form hidden" onsubmit="doRegister(event)">
+        <p class="auth-desc" data-i18n="auth.register.desc">Crea tu cuenta gratuita para guardar tus análisis.</p>
+        <div class="auth-field">
+          <label data-i18n="auth.name">Nombre</label>
+          <input type="text" id="regName" class="auth-input" placeholder="Tu nombre"/>
+        </div>
+        <div class="auth-field">
+          <label data-i18n="auth.email">Email</label>
+          <input type="email" id="regEmail" class="auth-input" required placeholder="tu@email.com"/>
+        </div>
+        <div class="auth-field">
+          <label data-i18n="auth.password">Contraseña</label>
+          <input type="password" id="regPassword" class="auth-input" required placeholder="Mín. 6 caracteres"/>
+        </div>
+        <div class="auth-error hidden" id="registerError"></div>
+        <button type="submit" class="auth-submit ripple" data-i18n="auth.register.btn">Crear cuenta</button>
+        <button type="button" class="auth-guest" onclick="continueAsGuest()" data-i18n="auth.guest">Continuar como invitado →</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- User menu (en navbar) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

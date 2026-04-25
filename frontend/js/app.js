@@ -5,14 +5,39 @@
    Tab fix (CSS-only, no GSAP for opacity)
    ============================================================ */
 
-// API base URL (empty = same origin; set AUDIAL_API in config.js or env for remote backend)
 const API = (window.AUDIAL_API || '').replace(/\/$/, '');
 
-// Attach session ID to every fetch
+// ── Auth state ────────────────────────────────────────────────────────
+let _authToken = localStorage.getItem('audial_token') || null;
+let _authUser  = JSON.parse(localStorage.getItem('audial_user') || 'null');
+
+function _setAuth(token, user) {
+  _authToken = token; _authUser = user;
+  if (token) { localStorage.setItem('audial_token', token); localStorage.setItem('audial_user', JSON.stringify(user)); }
+  else { localStorage.removeItem('audial_token'); localStorage.removeItem('audial_user'); }
+  _updateUserNav();
+}
+
+function _updateUserNav() {
+  const avatar = $('#userAvatar'), nameEl = $('#userNavName'), emailEl = $('#userMenuEmail');
+  if (_authUser) {
+    if (avatar) { avatar.textContent = (_authUser.display_name || _authUser.email || '?')[0].toUpperCase(); }
+    if (nameEl)  nameEl.textContent = _authUser.display_name || _authUser.email || '';
+    if (emailEl) emailEl.textContent = _authUser.email || '';
+  } else {
+    if (avatar)  avatar.textContent = '?';
+    if (nameEl)  nameEl.textContent = t('auth.guest.short');
+    if (emailEl) emailEl.textContent = '';
+  }
+}
+
+// Intercept fetch: add auth header + session ID to all /api calls
 const _fetch = window.fetch.bind(window);
 window.fetch = function(url, opts = {}) {
-  if (typeof url === 'string' && url.startsWith(API + '/api')) {
-    opts.headers = { ...(opts.headers || {}), 'X-Session-ID': window.AUDIAL_SESSION || '' };
+  if (typeof url === 'string' && (url.startsWith(API + '/api') || url.startsWith('/api'))) {
+    const headers = { ...(opts.headers || {}), 'X-Session-ID': window.AUDIAL_SESSION || '' };
+    if (_authToken) headers['Authorization'] = `Bearer ${_authToken}`;
+    opts.headers = headers;
   }
   return _fetch(url, opts);
 };
@@ -216,27 +241,12 @@ window.addEventListener('langchange', () => {
   } else if (pageId === 'page-dashboard') {
     refreshDashboard();
   } else if (pageId === 'page-detail' && currentAudioId) {
-    // Re-render only the static labels of the active tab (data comes from backend, not i18n)
-    // Re-render tasks/decisions/questions labels and static strings
-    $$('.col-title [data-i18n]').forEach(el => {
-      const v = t(el.dataset.i18n); if (v) el.textContent = v;
-    });
-    // Refresh tab labels
-    $$('.tab-btn [data-i18n]').forEach(el => {
-      const v = t(el.dataset.i18n); if (v) el.textContent = v;
-    });
-    // Refresh metrics labels if metrics panel visible
-    const metricsPanel = $('.tab-panel[data-tab="metrics"]');
-    if (metricsPanel?.classList.contains('active')) {
-      const a = window._lastAnalysis;
-      if (a) safe(() => renderMetrics(a.metrics));
-    }
-    // Refresh transcript count label
+    // Traduce el análisis en el nuevo idioma via backend (Groq)
+    const newLang = window.i18n?.lang || 'es';
+    translateAndRender(currentAudioId, newLang);
+    // Actualizar etiquetas estáticas
     const cnt = $('#transcriptCount');
-    if (cnt) {
-      const n = $$('.segment-row').length;
-      if (n) cnt.textContent = `${n} ${t('transcript.count')}`;
-    }
+    if (cnt) { const n = $$('.segment-row').length; if (n) cnt.textContent = `${n} ${t('transcript.count')}`; }
   } else if (pageId === 'page-chat') {
     const chatInput = $('#chatInput');
     if (chatInput) chatInput.placeholder = t('chat.placeholder');
@@ -859,11 +869,140 @@ function appendTyping() {
 })();
 
 /* ============================================================
+   AUTH — Login / Register / Logout
+   ============================================================ */
+let _authModal = null;
+
+function _getAuthModal() {
+  if (!_authModal) _authModal = new bootstrap.Modal('#authModal', { backdrop: 'static' });
+  return _authModal;
+}
+
+window.switchAuthTab = function(tab) {
+  $$('.auth-tab').forEach(b => b.classList.remove('active'));
+  $(`#tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`)?.classList.add('active');
+  $('#loginForm')?.classList.toggle('hidden', tab !== 'login');
+  $('#registerForm')?.classList.toggle('hidden', tab !== 'register');
+};
+
+window.continueAsGuest = function() {
+  _setAuth(null, null);
+  _getAuthModal().hide();
+  refreshAudios();
+};
+
+window.toggleUserMenu = function() {
+  const menu = $('#userMenu');
+  if (!menu) return;
+  if (_authUser) {
+    menu.classList.toggle('hidden');
+    // Close on outside click
+    setTimeout(() => {
+      const handler = e => { if (!$('#userNavItem')?.contains(e.target)) { menu.classList.add('hidden'); document.removeEventListener('click', handler); } };
+      document.addEventListener('click', handler);
+    }, 50);
+  } else {
+    _getAuthModal().show();
+  }
+};
+
+window.doLogin = async function(e) {
+  e.preventDefault();
+  const errEl = $('#loginError');
+  errEl?.classList.add('hidden');
+  try {
+    const r = await _fetch(`${API}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('#loginEmail').value, password: $('#loginPassword').value }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Error');
+    _setAuth(data.token, { email: data.email, display_name: data.display_name });
+    _getAuthModal().hide();
+    refreshAudios(); refreshDashboard();
+  } catch (err) {
+    if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+  }
+};
+
+window.doRegister = async function(e) {
+  e.preventDefault();
+  const errEl = $('#registerError');
+  errEl?.classList.add('hidden');
+  try {
+    const r = await _fetch(`${API}/api/auth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: $('#regEmail').value, password: $('#regPassword').value, display_name: $('#regName').value }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Error');
+    _setAuth(data.token, { email: data.email, display_name: data.display_name });
+    _getAuthModal().hide();
+    refreshAudios(); refreshDashboard();
+  } catch (err) {
+    if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+  }
+};
+
+window.doLogout = function() {
+  _setAuth(null, null);
+  $('#userMenu')?.classList.add('hidden');
+  refreshAudios(); refreshDashboard();
+};
+
+/* ============================================================
+   DYNAMIC TRANSLATION when lang changes on detail page
+   ============================================================ */
+async function translateAndRender(audioId, targetLang) {
+  // Show translating indicator
+  const panel = $('.tab-panel[data-tab="summary"]');
+  if (panel) {
+    const badge = document.createElement('div');
+    badge.className = 'translating-badge';
+    badge.id = 'translatingBadge';
+    badge.innerHTML = `<span class="spinner-border text-accent"></span> ${t('auth.translating')}`;
+    panel.insertBefore(badge, panel.firstChild);
+  }
+
+  try {
+    const r = await fetch(`${API}/api/analysis/${audioId}?lang=${targetLang}`);
+    if (!r.ok) return;
+    const a = await r.json();
+    window._lastAnalysis = a;
+    safe(() => renderSummary(a));
+    safe(() => renderEntities(a.entities));
+    safe(() => renderTasks(a.tasks, a.decisions, a.questions));
+    safe(() => renderSentiment(a.sentiment, a.conflicts));
+    safe(() => renderTopics(a.topics, a.intents));
+    safe(() => renderTimeline(a.timeline));
+    safe(() => renderMetrics(a.metrics));
+    refreshIcons();
+  } finally {
+    $('#translatingBadge')?.remove();
+  }
+}
+
+/* ============================================================
    BOOT
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   refreshIcons();
+  _updateUserNav();
+
+  // Show auth modal if not logged in and not dismissed before
+  const dismissed = localStorage.getItem('audial_auth_dismissed');
+  if (!_authToken && !dismissed) {
+    setTimeout(() => _getAuthModal()?.show(), 800);
+  }
+
   refreshAudios();
   refreshDashboard();
   setInterval(refreshDashboard, 30000);
 });
+
+// Save dismissed state when guest is chosen
+const origContinueAsGuest = window.continueAsGuest;
+window.continueAsGuest = function() {
+  localStorage.setItem('audial_auth_dismissed', '1');
+  origContinueAsGuest();
+};

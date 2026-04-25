@@ -37,6 +37,18 @@ class JobStatus(str, enum.Enum):
     FAILED  = "failed"
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id:              Mapped[str]         = mapped_column(String(64), primary_key=True, default=_uuid)
+    email:           Mapped[str]         = mapped_column(String(256), unique=True)
+    display_name:    Mapped[str]         = mapped_column(String(128), default="")
+    hashed_password: Mapped[str]         = mapped_column(String(256))
+    created_at:      Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+
+    audios = relationship("Audio", back_populates="owner", cascade="all, delete")
+
+
 class Audio(Base):
     __tablename__ = "audios"
 
@@ -49,6 +61,10 @@ class Audio(Base):
     uploaded_at: Mapped[dt.datetime]  = mapped_column(DateTime, default=dt.datetime.utcnow)
     session_id:  Mapped[str]          = mapped_column(String(64), default="")
     ui_language: Mapped[str]          = mapped_column(String(8),  default="es")
+    # Auth: si el usuario está logueado, se guarda aquí; si no, se usa session_id
+    user_id:     Mapped[str|None]     = mapped_column(String(64), nullable=True)
+
+    owner = relationship("User", back_populates="audios", foreign_keys=[user_id])
 
     jobs       = relationship("Job",        back_populates="audio", cascade="all, delete")
     transcript = relationship("Transcript", back_populates="audio", uselist=False, cascade="all, delete")
@@ -152,6 +168,7 @@ def init_db() -> None:
     with engine.begin() as conn:
         _add_column_if_missing(conn, "audios", "session_id",  "VARCHAR(64) DEFAULT ''")
         _add_column_if_missing(conn, "audios", "ui_language", "VARCHAR(8)  DEFAULT 'es'")
+        _add_column_if_missing(conn, "audios", "user_id",     "VARCHAR(64)")
 
 
 def get_db():

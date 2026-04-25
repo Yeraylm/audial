@@ -132,6 +132,20 @@ const TRANSLATIONS = {
     'chat.all':          'Todas las conversaciones',
 
     'footer':            'Audial · Plataforma IA Conversacional · Procesamiento 100% local · TFM 2026',
+
+    'auth.login':         'Iniciar sesión',
+    'auth.register':      'Crear cuenta',
+    'auth.email':         'Email',
+    'auth.password':      'Contraseña',
+    'auth.name':          'Nombre',
+    'auth.login.desc':    'Accede a tus conversaciones desde cualquier dispositivo.',
+    'auth.register.desc': 'Crea tu cuenta gratuita para guardar tus análisis.',
+    'auth.login.btn':     'Entrar',
+    'auth.register.btn':  'Crear cuenta',
+    'auth.guest':         'Continuar como invitado →',
+    'auth.guest.short':   'Invitado',
+    'auth.logout':        'Cerrar sesión',
+    'auth.translating':   'Traduciendo análisis…',
   },
 
   en: {
@@ -263,6 +277,20 @@ const TRANSLATIONS = {
     'chat.all':          'All conversations',
 
     'footer':            'Audial · Conversational AI Platform · 100% local processing · TFM 2026',
+
+    'auth.login':         'Sign in',
+    'auth.register':      'Create account',
+    'auth.email':         'Email',
+    'auth.password':      'Password',
+    'auth.name':          'Name',
+    'auth.login.desc':    'Access your conversations from any device.',
+    'auth.register.desc': 'Create your free account to save your analyses.',
+    'auth.login.btn':     'Sign in',
+    'auth.register.btn':  'Create account',
+    'auth.guest':         'Continue as guest →',
+    'auth.guest.short':   'Guest',
+    'auth.logout':        'Sign out',
+    'auth.translating':   'Translating analysis…',
   }
 };
 
