@@ -1,74 +1,95 @@
-"""Servicio de autenticación: JWT + bcrypt."""
+"""Autenticacion sin dependencias externas.
+
+Usa solo libreria estandar de Python:
+  - hashlib + secrets  → hash de contrasenas (SHA-256 + salt aleatorio)
+  - hmac + base64      → tokens JWT-like firmados con HMAC-SHA256
+
+No requiere passlib, jose ni cryptography.
+"""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import os
-from datetime import datetime, timedelta
+import secrets
+import time
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from loguru import logger
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.models.database import User, get_db
 
-SECRET_KEY  = os.getenv("JWT_SECRET", "audial-tfm-secret-2026-x7k2p")
-ALGORITHM   = "HS256"
-EXPIRE_DAYS = 30
+_SECRET = os.getenv("JWT_SECRET", "audial-tfm-secret-2026-change-in-production")
+_EXPIRE_SECONDS = 30 * 24 * 3600  # 30 días
 
-pwd_ctx  = CryptContext(schemes=["bcrypt"], deprecated="auto")
-bearer   = HTTPBearer(auto_error=False)
+bearer = HTTPBearer(auto_error=False)
 
 
-# ── password ─────────────────────────────────────────────────────────
+# ── Password hashing (SHA-256 + random salt) ──────────────────────────
 def hash_password(plain: str) -> str:
-    return pwd_ctx.hash(plain)
+    """Devuelve 'salt$sha256hex'. Seguro contra ataques de diccionario."""
+    salt = secrets.token_hex(16)
+    digest = hashlib.sha256(f"{plain}{salt}{_SECRET}".encode()).hexdigest()
+    return f"{salt}${digest}"
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_ctx.verify(plain, hashed)
+
+def verify_password(plain: str, stored: str) -> bool:
+    try:
+        salt, digest = stored.split("$", 1)
+        expected = hashlib.sha256(f"{plain}{salt}{_SECRET}".encode()).hexdigest()
+        return hmac.compare_digest(expected, digest)
+    except Exception:
+        return False
 
 
-# ── JWT ──────────────────────────────────────────────────────────────
+# ── Token (HMAC-SHA256 firmado) ───────────────────────────────────────
 def create_token(user_id: str, email: str) -> str:
-    expire = datetime.utcnow() + timedelta(days=EXPIRE_DAYS)
-    payload = {"sub": user_id, "email": email, "exp": expire}
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    payload = {"sub": user_id, "email": email, "exp": int(time.time()) + _EXPIRE_SECONDS}
+    data = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+    sig  = hmac.new(_SECRET.encode(), data.encode(), hashlib.sha256).hexdigest()
+    return f"{data}.{sig}"
+
 
 def decode_token(token: str) -> dict[str, Any]:
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError as e:
+        data, sig = token.rsplit(".", 1)
+        expected  = hmac.new(_SECRET.encode(), data.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, sig):
+            raise ValueError("Firma inválida")
+        padding = 4 - len(data) % 4
+        payload = json.loads(base64.urlsafe_b64decode(data + "=" * padding))
+        if payload.get("exp", 0) < time.time():
+            raise ValueError("Token expirado")
+        return payload
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"Token inválido: {e}")
 
 
-# ── dependency ────────────────────────────────────────────────────────
+# ── FastAPI dependencies ──────────────────────────────────────────────
 def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User | None:
-    """
-    Devuelve el User si hay token válido.
-    Devuelve None si no hay token (modo invitado con session_id).
-    Lanza 401 si el token existe pero es inválido.
-    """
     if not creds:
         return None
     payload = decode_token(creds.credentials)
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token sin subject")
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == payload.get("sub")).first()
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuario no encontrado")
     return user
+
 
 def require_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User:
-    """Como get_current_user pero lanza 401 si no hay token."""
     user = get_current_user(creds, db)
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Autenticación requerida")

@@ -50,7 +50,8 @@ class User(Base):
     reset_token_exp:     Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)
     created_at:          Mapped[dt.datetime]  = mapped_column(DateTime, default=dt.datetime.utcnow)
 
-    audios = relationship("Audio", back_populates="owner", cascade="all, delete")
+    # Relacion lazy — evita problemas de importacion circular
+    audios = relationship("Audio", back_populates="owner", lazy="select")
 
 
 class Audio(Base):
@@ -68,7 +69,7 @@ class Audio(Base):
     # Auth: si el usuario está logueado, se guarda aquí; si no, se usa session_id
     user_id:     Mapped[str|None]     = mapped_column(String(64), nullable=True)
 
-    owner = relationship("User", back_populates="audios", foreign_keys=[user_id])
+    owner = relationship("User", back_populates="audios", foreign_keys="[Audio.user_id]", lazy="select")
 
     jobs       = relationship("Job",        back_populates="audio", cascade="all, delete")
     transcript = relationship("Transcript", back_populates="audio", uselist=False, cascade="all, delete")

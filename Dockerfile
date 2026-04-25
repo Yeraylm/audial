@@ -23,8 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
         faster-whisper \
         sentence-transformers \
-        chromadb \
-        psycopg2-binary
+        chromadb
 
 # Código de la aplicación
 COPY --chown=user backend/ ./backend/
