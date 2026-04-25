@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Audial · Admin BD</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2339FF14'/><text x='6' y='22' font-size='18' font-weight='900' fill='%23050a05'>DB</text></svg>"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/admin.css"/>
+</head>
+<body>
+
+<!-- Login screen -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🗄️</div>
+    <h1>Audial Admin</h1>
+    <p>Panel de administración de base de datos</p>
+    <div class="login-error hidden" id="loginErr"></div>
+    <input type="password" id="adminSecret" class="adm-input" placeholder="Clave de administrador" autocomplete="current-password"/>
+    <button class="adm-btn-primary w-100 mt-3" onclick="doAdminLogin()">Acceder</button>
+    <p class="hint">La clave se configura con la variable <code>ADMIN_SECRET</code></p>
+  </div>
+</div>
+
+<!-- Main panel -->
+<div id="adminPanel" class="admin-layout hidden">
+
+  <!-- Sidebar -->
+  <aside class="adm-sidebar">
+    <div class="adm-brand">
+      <span class="adm-brand-icon">🗄️</span>
+      <div>
+        <div class="adm-brand-name">Admin BD</div>
+        <div class="adm-brand-sub" id="sidebarDbUrl">SQLite local</div>
+      </div>
+    </div>
+
+    <div class="adm-section-label">Tablas</div>
+    <div id="tableList" class="adm-table-list"></div>
+
+    <div class="adm-spacer"></div>
+    <button class="adm-sql-btn" onclick="showSqlEditor()">⌨ Editor SQL</button>
+    <button class="adm-logout-btn" onclick="doLogout()">✕ Cerrar sesión</button>
+  </aside>
+
+  <!-- Content -->
+  <main class="adm-content">
+
+    <!-- Overview -->
+    <div id="viewOverview" class="adm-view active">
+      <div class="adm-page-title">
+        <h2>Resumen del sistema</h2>
+        <button class="adm-btn-sm" onclick="loadOverview()">↻ Actualizar</button>
+      </div>
+      <div id="statsGrid" class="stats-grid"></div>
+
+      <h3 class="mt-4 mb-3" style="font-size:16px;font-weight:700">Acciones rápidas</h3>
+      <div class="quick-actions">
+        <button class="quick-card" onclick="showTable('users')">👤 Gestionar usuarios</button>
+        <button class="quick-card" onclick="showTable('audios')">🎙 Ver audios</button>
+        <button class="quick-card" onclick="showTable('analyses')">🧠 Ver análisis</button>
+        <button class="quick-card" onclick="showTable('jobs')">⚙️ Ver jobs</button>
+        <button class="quick-card" onclick="showSqlEditor()">⌨ SQL libre</button>
+        <button class="quick-card danger" onclick="confirmDeleteGuest()">🗑 Limpiar invitados</button>
+      </div>
+    </div>
+
+    <!-- Table view -->
+    <div id="viewTable" class="adm-view">
+      <div class="adm-page-title">
+        <div>
+          <h2 id="tableViewTitle">tabla</h2>
+          <small id="tableViewMeta" class="text-muted"></small>
+        </div>
+        <div class="d-flex gap-2">
+          <input id="tableSearch" class="adm-input-sm" placeholder="Buscar…" oninput="filterTable()"/>
+          <button class="adm-btn-sm" id="prevPageBtn" onclick="changePage(-1)">‹ Anterior</button>
+          <span id="pageInfo" class="adm-page-info"></span>
+          <button class="adm-btn-sm" id="nextPageBtn" onclick="changePage(1)">Siguiente ›</button>
+        </div>
+      </div>
+      <div class="adm-table-wrap">
+        <table class="adm-table" id="mainTable">
+          <thead id="mainTableHead"></thead>
+          <tbody id="mainTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SQL editor -->
+    <div id="viewSql" class="adm-view">
+      <div class="adm-page-title">
+        <h2>⌨ Editor SQL</h2>
+        <div class="d-flex gap-2">
+          <button class="adm-btn-sm" onclick="clearSql()">Limpiar</button>
+          <button class="adm-btn-primary" onclick="runSql()">▶ Ejecutar</button>
+        </div>
+      </div>
+      <div class="sql-shortcuts">
+        <button onclick="setSql('SELECT * FROM users LIMIT 50')">usuarios</button>
+        <button onclick="setSql('SELECT * FROM audios ORDER BY uploaded_at DESC LIMIT 50')">audios</button>
+        <button onclick="setSql('SELECT * FROM jobs ORDER BY id DESC LIMIT 50')">jobs</button>
+        <button onclick="setSql('SELECT * FROM analyses LIMIT 50')">analyses</button>
+        <button onclick="setSql('DELETE FROM audios WHERE user_id IS NULL AND expires_at < datetime(\'now\')')">limpiar invitados</button>
+        <button onclick="setSql('SELECT COUNT(*) as total, user_id FROM audios GROUP BY user_id')">audios/usuario</button>
+      </div>
+      <textarea id="sqlEditor" class="sql-editor" placeholder="SELECT * FROM users;" spellcheck="false"></textarea>
+      <div id="sqlResult" class="sql-result hidden"></div>
+    </div>
+
+    <!-- Edit modal -->
+    <div class="adm-modal-overlay hidden" id="editModal">
+      <div class="adm-modal">
+        <div class="adm-modal-header">
+          <h3 id="editModalTitle">Editar registro</h3>
+          <button onclick="closeEditModal()">✕</button>
+        </div>
+        <div id="editModalBody" class="adm-modal-body"></div>
+        <div class="adm-modal-footer">
+          <button class="adm-btn-danger" id="deleteRowBtn">🗑 Eliminar</button>
+          <button class="adm-btn-sm" onclick="closeEditModal()">Cancelar</button>
+          <button class="adm-btn-primary" onclick="saveRow()">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/js/admin.js?v=1"></script>
+</body>
+</html>

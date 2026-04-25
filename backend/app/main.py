@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.models import init_db
 from app.routes import analysis, audio, dashboard, search
 from app.routes import auth as auth_routes
+from app.routes import admin as admin_routes
 from app.services.guest_cleanup import run_periodic_cleanup
 
 
@@ -48,6 +49,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_routes.router)
+app.include_router(admin_routes.router)
 app.include_router(audio.router)
 app.include_router(analysis.router)
 app.include_router(search.router)
@@ -73,6 +75,11 @@ if FRONTEND_DIR.exists():
             FRONTEND_DIR / "index.html",
             headers={"Cache-Control": "no-store, must-revalidate"},
         )
+
+    @app.get("/admin", include_in_schema=False)
+    def admin_page() -> FileResponse:
+        return FileResponse(FRONTEND_DIR / "admin.html",
+                            headers={"Cache-Control": "no-store"})
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> Response:
