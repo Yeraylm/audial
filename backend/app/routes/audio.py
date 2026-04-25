@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse as FastFileResponse
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -142,6 +143,19 @@ def job_status(job_id: str, db: Session = Depends(get_db)):
     if not j:
         raise HTTPException(404, "Job no encontrado")
     return j
+
+
+@router.get("/{audio_id}/file")
+def stream_audio(audio_id: str, db: Session = Depends(get_db)):
+    """Sirve el archivo de audio original para el reproductor del frontend."""
+    a = db.query(Audio).filter(Audio.id == audio_id).first()
+    if not a:
+        raise HTTPException(404, "Audio no encontrado")
+    p = Path(a.filepath)
+    if not p.exists():
+        raise HTTPException(404, "Archivo de audio no encontrado en disco")
+    media_type = a.mime_type or "audio/mpeg"
+    return FastFileResponse(str(p), media_type=media_type, headers={"Accept-Ranges": "bytes"})
 
 
 @router.delete("/{audio_id}")

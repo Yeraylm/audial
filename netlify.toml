@@ -30,6 +30,13 @@
   status = 200
   force  = true
 
+# Audio file streaming (range requests for the player)
+[[redirects]]
+  from   = "/api/audio/*/file"
+  to     = "https://yeray22-audial-backend.hf.space/api/audio/:splat/file"
+  status = 200
+  force  = true
+
 # SPA fallback — siempre al final
 [[redirects]]
   from   = "/*"

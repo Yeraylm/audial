@@ -7,6 +7,8 @@
 // En desarrollo: mismo origen (el servidor FastAPI sirve el frontend).
 // En Netlify: apunta al backend en Render/Railway via proxy redirect.
 window.AUDIAL_API = window.AUDIAL_API || '';
+// Google Client ID (opcional — configura GOOGLE_CLIENT_ID en Netlify si quieres login con Google)
+window.AUDIAL_GOOGLE_CLIENT_ID = window.AUDIAL_GOOGLE_CLIENT_ID || '';
 
 /* Session ID — multi-usuario ligero via localStorage.
    Cada navegador/dispositivo tiene su propio espacio de datos. */

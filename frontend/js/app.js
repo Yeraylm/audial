@@ -494,6 +494,18 @@ window.openAudio = async function(id) {
   $('#exportJsonBtn') && ($('#exportJsonBtn').onclick = () => window.open(`${API}/api/analysis/${id}/export.json`,'_blank'));
   $('#exportPdfBtn')  && ($('#exportPdfBtn').onclick  = () => window.open(`${API}/api/analysis/${id}/export.pdf`, '_blank'));
 
+  // Audio player
+  const playerBar  = $('#audioPlayerBar');
+  const playerSrc  = $('#audioPlayerSrc');
+  const playerName = $('#audioPlayerName');
+  const player     = $('#audioPlayer');
+  if (playerBar && playerSrc && player) {
+    playerSrc.src = `${API}/api/audio/${id}/file`;
+    player.load();
+    if (playerName) playerName.textContent = id.slice(0,8) + '…';
+    playerBar.style.display = 'flex';
+  }
+
   const [aRes, tRes] = await Promise.all([
     fetch(`${API}/api/analysis/${id}`),
     fetch(`${API}/api/analysis/${id}/transcript`),
@@ -516,6 +528,11 @@ window.openAudio = async function(id) {
   const [a, tr] = await Promise.all([aRes.json(), tRes.json()]);
   if (titleEl)  titleEl.textContent  = a.summary_short?.slice(0,50) + (a.summary_short?.length > 50 ? '…' : '') || id.slice(0,8);
   if (headerEl) headerEl.textContent = t('detail.title');
+
+  // Actualizar nombre en el reproductor
+  const audioInfo = await fetch(`${API}/api/audio/${id}`).then(r => r.ok ? r.json() : null).catch(() => null);
+  const pName = $('#audioPlayerName');
+  if (pName && audioInfo?.filename) pName.textContent = audioInfo.filename;
 
   window._lastAnalysis = a; // cache for lang re-render
 
@@ -869,86 +886,127 @@ function appendTyping() {
 })();
 
 /* ============================================================
-   AUTH — Login / Register / Logout
+   AUTH — Login / Register / Logout / Google OAuth
    ============================================================ */
 let _authModal = null;
 
 function _getAuthModal() {
-  if (!_authModal) _authModal = new bootstrap.Modal('#authModal', { backdrop: 'static' });
+  if (!_authModal && window.bootstrap) {
+    const el = document.getElementById('authModal');
+    if (el) _authModal = new bootstrap.Modal(el, { backdrop: 'static' });
+  }
   return _authModal;
 }
 
-window.switchAuthTab = function(tab) {
+function _switchAuthTab(tab) {
   $$('.auth-tab').forEach(b => b.classList.remove('active'));
-  $(`#tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`)?.classList.add('active');
+  $(`#tab${tab[0].toUpperCase() + tab.slice(1)}`)?.classList.add('active');
   $('#loginForm')?.classList.toggle('hidden', tab !== 'login');
   $('#registerForm')?.classList.toggle('hidden', tab !== 'register');
-};
+}
 
-window.continueAsGuest = function() {
+function _continueAsGuest() {
+  localStorage.setItem('audial_auth_dismissed', '1');
   _setAuth(null, null);
-  _getAuthModal().hide();
+  _getAuthModal()?.hide();
   refreshAudios();
-};
+}
 
-window.toggleUserMenu = function() {
-  const menu = $('#userMenu');
-  if (!menu) return;
-  if (_authUser) {
-    menu.classList.toggle('hidden');
-    // Close on outside click
-    setTimeout(() => {
-      const handler = e => { if (!$('#userNavItem')?.contains(e.target)) { menu.classList.add('hidden'); document.removeEventListener('click', handler); } };
-      document.addEventListener('click', handler);
-    }, 50);
-  } else {
-    _getAuthModal().show();
-  }
-};
-
-window.doLogin = async function(e) {
-  e.preventDefault();
+async function _doLogin(e) {
+  e?.preventDefault();
   const errEl = $('#loginError');
   errEl?.classList.add('hidden');
   try {
     const r = await _fetch(`${API}/api/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: $('#loginEmail').value, password: $('#loginPassword').value }),
+      body: JSON.stringify({ email: $('#loginEmail')?.value || '', password: $('#loginPassword')?.value || '' }),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Error');
     _setAuth(data.token, { email: data.email, display_name: data.display_name });
-    _getAuthModal().hide();
+    _getAuthModal()?.hide();
     refreshAudios(); refreshDashboard();
   } catch (err) {
     if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
   }
-};
+}
 
-window.doRegister = async function(e) {
-  e.preventDefault();
+async function _doRegister(e) {
+  e?.preventDefault();
   const errEl = $('#registerError');
   errEl?.classList.add('hidden');
   try {
     const r = await _fetch(`${API}/api/auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: $('#regEmail').value, password: $('#regPassword').value, display_name: $('#regName').value }),
+      body: JSON.stringify({ email: $('#regEmail')?.value || '', password: $('#regPassword')?.value || '', display_name: $('#regName')?.value || '' }),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Error');
     _setAuth(data.token, { email: data.email, display_name: data.display_name });
-    _getAuthModal().hide();
+    _getAuthModal()?.hide();
     refreshAudios(); refreshDashboard();
   } catch (err) {
     if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
   }
-};
+}
 
-window.doLogout = function() {
+function _doLogout() {
   _setAuth(null, null);
+  localStorage.removeItem('audial_auth_dismissed');
   $('#userMenu')?.classList.add('hidden');
   refreshAudios(); refreshDashboard();
+}
+
+function _toggleUserMenu() {
+  const menu = $('#userMenu');
+  if (!menu) return;
+  if (_authUser) {
+    menu.classList.toggle('hidden');
+    setTimeout(() => {
+      const handler = ev => {
+        if (!document.getElementById('userNavItem')?.contains(ev.target)) {
+          menu.classList.add('hidden');
+          document.removeEventListener('click', handler);
+        }
+      };
+      document.addEventListener('click', handler);
+    }, 50);
+  } else {
+    _getAuthModal()?.show();
+  }
+}
+
+// Google OAuth callback
+window.handleGoogleCredential = async function(response) {
+  try {
+    const r = await _fetch(`${API}/api/auth/google`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Error Google auth');
+    _setAuth(data.token, { email: data.email, display_name: data.display_name });
+    _getAuthModal()?.hide();
+    refreshAudios(); refreshDashboard();
+  } catch (err) {
+    console.error('[Audial] Google auth error:', err);
+    const errEl = $('#loginError');
+    if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+  }
 };
+
+function _initGoogleAuth() {
+  // Google button only renders if GOOGLE_CLIENT_ID is configured
+  const clientId = window.AUDIAL_GOOGLE_CLIENT_ID;
+  if (!clientId || !window.google) return;
+  ['googleSignInBtn', 'googleSignInBtnReg'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.parentElement?.classList.remove('hidden');
+    google.accounts.id.initialize({ client_id: clientId, callback: window.handleGoogleCredential });
+    google.accounts.id.renderButton(el, { theme: 'filled_black', size: 'large', width: 320 });
+  });
+}
 
 /* ============================================================
    DYNAMIC TRANSLATION when lang changes on detail page
@@ -983,26 +1041,50 @@ async function translateAndRender(audioId, targetLang) {
 }
 
 /* ============================================================
-   BOOT
+   BOOT — event listeners centralizados (sin onclick inline)
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   refreshIcons();
   _updateUserNav();
 
-  // Show auth modal if not logged in and not dismissed before
+  // Auth tabs
+  document.getElementById('tabLogin')?.addEventListener('click', () => _switchAuthTab('login'));
+  document.getElementById('tabRegister')?.addEventListener('click', () => _switchAuthTab('register'));
+
+  // Login form
+  document.getElementById('loginForm')?.addEventListener('submit', _doLogin);
+  document.getElementById('loginSubmitBtn')?.addEventListener('click', _doLogin);
+
+  // Register form
+  document.getElementById('registerForm')?.addEventListener('submit', _doRegister);
+  document.getElementById('registerSubmitBtn')?.addEventListener('click', _doRegister);
+
+  // Guest buttons
+  document.getElementById('guestBtn')?.addEventListener('click', _continueAsGuest);
+  document.getElementById('guestBtnReg')?.addEventListener('click', _continueAsGuest);
+
+  // User nav button
+  document.getElementById('userNavBtn')?.addEventListener('click', _toggleUserMenu);
+
+  // Logout
+  document.getElementById('logoutBtn')?.addEventListener('click', _doLogout);
+
+  // Lang switch buttons
+  document.querySelector('[data-lang-btn="es"]')?.addEventListener('click', () => i18n.setLang('es'));
+  document.querySelector('[data-lang-btn="en"]')?.addEventListener('click', () => i18n.setLang('en'));
+
+  // Google OAuth (después de que cargue el script de Google)
+  if (window.google) _initGoogleAuth();
+  else document.querySelector('script[src*="accounts.google.com"]')
+    ?.addEventListener('load', _initGoogleAuth);
+
+  // Show auth modal if not logged in and not dismissed
   const dismissed = localStorage.getItem('audial_auth_dismissed');
   if (!_authToken && !dismissed) {
-    setTimeout(() => _getAuthModal()?.show(), 800);
+    setTimeout(() => _getAuthModal()?.show(), 900);
   }
 
   refreshAudios();
   refreshDashboard();
   setInterval(refreshDashboard, 30000);
 });
-
-// Save dismissed state when guest is chosen
-const origContinueAsGuest = window.continueAsGuest;
-window.continueAsGuest = function() {
-  localStorage.setItem('audial_auth_dismissed', '1');
-  origContinueAsGuest();
-};
