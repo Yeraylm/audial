@@ -54,6 +54,17 @@ def _new_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def _gen_code() -> str:
+    """Genera un código de 6 dígitos."""
+    import random
+    return f"{random.randint(0, 999999):06d}"
+
+
+class VerifyCodeIn(BaseModel):
+    email: str
+    code:  str
+
+
 @router.post("/register", response_model=dict)
 def register(body: RegisterIn, db: Session = Depends(get_db)):
     try:
@@ -67,38 +78,72 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         if existing:
             raise HTTPException(400, "Ya existe una cuenta con ese email")
 
-        ver_token = _new_token()
+        code = _gen_code()
         user = User(
             email=email,
             display_name=(body.display_name or "").strip() or email.split("@")[0],
             hashed_password=hash_password(body.password),
             is_verified=0,
-            verification_token=ver_token,
+            verification_token=code,   # reutilizamos el campo para guardar el código
         )
         db.add(user)
         db.commit()
         db.refresh(user)
 
+        # Intentar enviar código por email
         email_sent = False
         try:
-            email_sent = send_verification_email(email, ver_token, user.display_name)
+            from app.services.email_service import RESEND_API_KEY, send_email
+            html = f"""
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+              <h1 style="color:#F5A623;font-size:28px">🎙 Audial</h1>
+              <p>Tu código de verificación es:</p>
+              <div style="font-size:40px;font-weight:900;letter-spacing:10px;color:#F5A623;
+                          background:#1a1726;padding:20px;border-radius:12px;text-align:center">
+                {code}
+              </div>
+              <p style="color:#888">Válido durante 15 minutos.</p>
+            </div>
+            """
+            if RESEND_API_KEY:
+                email_sent = send_email(email, "Tu código de verificación · Audial", html)
         except Exception as email_err:
             logger.warning(f"Email no enviado: {email_err}")
 
         return {
-            "message": "Cuenta creada.",
+            "message": "Código enviado.",
             "email_sent": email_sent,
             "user_id": user.id,
-            "token": create_token(user.id, user.email) if not email_sent else None,
             "email": user.email,
             "display_name": user.display_name,
-            "is_verified": False,
+            # Si no hay email configurado, devolvemos el código en la respuesta (modo dev)
+            "dev_code": code if not email_sent else None,
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(f"Error en register: {e}")
-        raise HTTPException(500, f"Error interno al registrar: {str(e)}")
+        raise HTTPException(500, f"Error interno: {str(e)}")
+
+
+@router.post("/verify-code", response_model=dict)
+def verify_code(body: VerifyCodeIn, db: Session = Depends(get_db)):
+    email = (body.email or "").strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(400, "Email no encontrado")
+    if not user.verification_token or user.verification_token != (body.code or "").strip():
+        raise HTTPException(400, "Código incorrecto")
+    user.is_verified = 1
+    user.verification_token = None
+    db.commit()
+    return {
+        "token": create_token(user.id, user.email),
+        "user_id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "is_verified": True,
+    }
 
 
 @router.get("/verify/{token}")

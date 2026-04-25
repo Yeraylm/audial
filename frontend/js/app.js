@@ -931,6 +931,8 @@ async function _doLogin(e) {
   }
 }
 
+let _pendingVerifyEmail = '';
+
 async function _doRegister(e) {
   e?.preventDefault();
   const errEl = $('#registerError');
@@ -947,38 +949,56 @@ async function _doRegister(e) {
     return;
   }
 
+  const email = $('#regEmail')?.value?.trim() || '';
   try {
     const r = await _fetch(`${API}/api/auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: $('#regEmail')?.value?.trim() || '',
-        password: pwd,
-        display_name: $('#regName')?.value?.trim() || '',
-      }),
+      body: JSON.stringify({ email, password: pwd, display_name: $('#regName')?.value?.trim() || '' }),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Error');
 
-    if (data.token) {
-      // Sin email de verificación configurado → login inmediato
-      _setAuth(data.token, { email: data.email, display_name: data.display_name, is_verified: data.is_verified });
-      _getAuthModal()?.hide();
-      refreshAudios(); refreshDashboard();
+    // Siempre mostramos el paso de verificación por código
+    _pendingVerifyEmail = email;
+    $('#registerForm')?.classList.add('hidden');
+    $('#verifyCodeStep')?.classList.remove('hidden');
+    $$('.auth-tab').forEach(b => b.classList.remove('active'));
+
+    const descEl = $('#verifyCodeDesc');
+    const devDisplay = $('#devCodeDisplay');
+    if (data.email_sent) {
+      if (descEl) descEl.textContent = t('auth.code_sent_email');
+      devDisplay?.classList.add('hidden');
     } else {
-      // Email de verificación enviado
-      if (errEl) {
-        errEl.style.background = 'rgba(106,176,76,.1)';
-        errEl.style.borderColor = 'rgba(106,176,76,.3)';
-        errEl.style.color = 'var(--emerald-lt)';
-        errEl.textContent = t('auth.verify_email_sent');
-        errEl.classList.remove('hidden');
+      if (descEl) descEl.textContent = t('auth.code_dev');
+      if (devDisplay && data.dev_code) {
+        devDisplay.textContent = `🔑 ${data.dev_code}`;
+        devDisplay.classList.remove('hidden');
       }
     }
+    $('#verifyCodeInput')?.focus();
   } catch (err) {
-    if (errEl) {
-      errEl.style.background = ''; errEl.style.borderColor = ''; errEl.style.color = '';
-      errEl.textContent = err.message; errEl.classList.remove('hidden');
-    }
+    if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+  }
+}
+
+async function _doVerifyCode() {
+  const code  = $('#verifyCodeInput')?.value?.trim() || '';
+  const errEl = $('#verifyError');
+  if (errEl) errEl.classList.add('hidden');
+  if (!code || code.length !== 6) return;
+  try {
+    const r = await _fetch(`${API}/api/auth/verify-code`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: _pendingVerifyEmail, code }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || t('auth.code_invalid'));
+    _setAuth(data.token, { email: data.email, display_name: data.display_name, is_verified: true });
+    _getAuthModal()?.hide();
+    refreshAudios(); refreshDashboard();
+  } catch (err) {
+    if (errEl) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
   }
 }
 
@@ -1135,6 +1155,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Register form
   document.getElementById('registerForm')?.addEventListener('submit', _doRegister);
   document.getElementById('registerSubmitBtn')?.addEventListener('click', _doRegister);
+
+  // Verify code
+  document.getElementById('verifySubmitBtn')?.addEventListener('click', _doVerifyCode);
+  document.getElementById('verifyCodeInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') _doVerifyCode(); });
+  document.getElementById('resendCodeBtn')?.addEventListener('click', () => {
+    $('#verifyCodeStep')?.classList.add('hidden');
+    $('#registerForm')?.classList.remove('hidden');
+    $$('.auth-tab').forEach((b,i) => b.classList.toggle('active', i === 1));
+  });
 
   // Guest buttons
   document.getElementById('guestBtn')?.addEventListener('click', _continueAsGuest);

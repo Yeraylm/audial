@@ -88,14 +88,13 @@ def list_audios(
         try:
             q = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500)
             if current_user:
-                # Usuario autenticado: ver solo SUS audios
                 q = q.filter(Audio.user_id == current_user.id)
             elif session_id:
-                # Invitado: filtrar por session_id (solo audios sin user_id)
-                q = q.filter(Audio.user_id == None, Audio.session_id == session_id)  # noqa: E711
+                # Invitado: audios de esta sesión (user_id nulo o coincide sesión)
+                q = q.filter(Audio.session_id == session_id)
             audios = q.all()
-        except Exception:
-            logger.warning("Filtro de usuario falló, devolviendo todos")
+        except Exception as _fe:
+            logger.warning(f"Filtro de usuario falló ({_fe}), devolviendo todos")
             audios = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500).all()
 
         for a in audios:
