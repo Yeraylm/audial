@@ -1,0 +1,34 @@
+{
+  "outputDirectory": "frontend",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://yeray22-audial-backend.hf.space/api/$1"
+    },
+    {
+      "source": "/docs",
+      "destination": "https://yeray22-audial-backend.hf.space/docs"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "https://yeray22-audial-backend.hf.space/openapi.json"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    },
+    {
+      "source": "/css/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+    },
+    {
+      "source": "/js/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+    }
+  ]
+}
