@@ -288,6 +288,11 @@ window.showPage = function(name) {
   if (name === 'conversations') refreshAudios();
   if (name === 'admin')         { adminLoadOverview(); adminSwitchTab('overview'); }
 
+  // Forzar visibilidad de .reveal en la página activa (evita opacity:0 persistente)
+  setTimeout(() => {
+    $$('.page.active .reveal').forEach(el => el.classList.add('visible'));
+  }, 80);
+
   i18n.applyTranslations();
   refreshIcons();
 };
@@ -1379,6 +1384,28 @@ document.addEventListener('click', e => {
 });
 
 /* ============================================================
+   ROLE REFRESH — sincroniza el rol del usuario con el servidor
+   Necesario cuando se cambia el rol desde el admin panel
+   ============================================================ */
+async function refreshUserRole() {
+  if (!_authToken) return;
+  try {
+    const r = await fetch(`${API}/api/auth/me`);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.authenticated && _authUser) {
+      const oldRole = _authUser.role;
+      _authUser.role = data.role;
+      localStorage.setItem('audial_user', JSON.stringify(_authUser));
+      if (oldRole !== data.role) {
+        _updateUserNav();
+        console.log(`[Audial] Rol actualizado: ${oldRole} → ${data.role}`);
+      }
+    }
+  } catch (e) { console.warn('[Audial] refreshUserRole:', e); }
+}
+
+/* ============================================================
    BOOT — event listeners centralizados (sin onclick inline)
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1448,5 +1475,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   refreshAudios();
   refreshDashboard();
+  // Sincronizar rol desde servidor (por si cambió en admin panel)
+  refreshUserRole();
   setInterval(refreshDashboard, 30000);
+  // Re-sincronizar rol cada 2 min por si el admin cambió el rol del usuario
+  setInterval(refreshUserRole, 120000);
 });
