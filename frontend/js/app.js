@@ -1170,8 +1170,10 @@ const ADMIN_PAGE_SIZE = 50;
 function _adminToken() { return _authToken || ''; }
 
 async function adFetch(url, opts = {}) {
+  // Usa _fetch para evitar el interceptor de auto-logout en 401
+  // El admin usa el JWT del usuario logueado como X-Admin-Token
   opts.headers = { ...(opts.headers || {}), 'X-Admin-Token': _adminToken() };
-  return fetch(url, opts);
+  return _fetch(url, opts);
 }
 
 async function adminLoadOverview() {
@@ -1390,16 +1392,29 @@ document.addEventListener('click', e => {
 async function refreshUserRole() {
   if (!_authToken) return;
   try {
-    const r = await fetch(`${API}/api/auth/me`);
+    // Usar _fetch directamente para evitar el interceptor de 401 en esta llamada
+    const r = await _fetch(`${API}/api/auth/me`, {
+      headers: { 'Authorization': `Bearer ${_authToken}` }
+    });
     if (!r.ok) return;
     const data = await r.json();
-    if (data.authenticated && _authUser) {
+
+    if (!data.authenticated) {
+      // Token inválido o usuario eliminado → cerrar sesión silenciosamente
+      console.warn('[Audial] Sesión inválida (usuario no encontrado en BD), cerrando sesión');
+      _setAuth(null, null);
+      refreshAudios();
+      refreshDashboard();
+      return;
+    }
+
+    if (_authUser) {
       const oldRole = _authUser.role;
-      _authUser.role = data.role;
+      _authUser.role = data.role || 'user';
       localStorage.setItem('audial_user', JSON.stringify(_authUser));
       if (oldRole !== data.role) {
-        _updateUserNav();
         console.log(`[Audial] Rol actualizado: ${oldRole} → ${data.role}`);
+        _updateUserNav();
       }
     }
   } catch (e) { console.warn('[Audial] refreshUserRole:', e); }
@@ -1475,9 +1490,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   refreshAudios();
   refreshDashboard();
-  // Sincronizar rol desde servidor (por si cambió en admin panel)
+  // Sincronizar rol desde servidor al arrancar (detecta usuarios eliminados o roles cambiados)
   refreshUserRole();
-  setInterval(refreshDashboard, 30000);
-  // Re-sincronizar rol cada 2 min por si el admin cambió el rol del usuario
-  setInterval(refreshUserRole, 120000);
+  setInterval(refreshDashboard, 60000);  // cada minuto
+  setInterval(refreshUserRole, 180000);  // cada 3 min
 });
