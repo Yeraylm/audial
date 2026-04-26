@@ -107,8 +107,8 @@
       <svg viewBox="0 0 120 120" class="upload-ring-svg">
         <defs>
           <linearGradient id="ring-grad" x1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#F5A623"/>
-            <stop offset="1" stop-color="#E85A4F"/>
+            <stop offset="0" stop-color="#39FF14"/>
+            <stop offset="1" stop-color="#00E5CC"/>
           </linearGradient>
         </defs>
         <circle cx="60" cy="60" r="54" class="ring-track"/>
@@ -512,7 +512,7 @@
       <button class="auth-close" id="authCloseBtn" title="Continuar como invitado">✕</button>
       <div class="auth-brand">
         <svg viewBox="0 0 28 28" width="28" height="28">
-          <defs><linearGradient id="alg" x1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5A623"/><stop offset="1" stop-color="#E85A4F"/></linearGradient></defs>
+          <defs><linearGradient id="alg" x1="0" x2="1" y2="1"><stop offset="0" stop-color="#39FF14"/><stop offset="1" stop-color="#00E5CC"/></linearGradient></defs>
           <path d="M4 18 Q14 4 24 18" stroke="url(#alg)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
           <circle cx="4" cy="18" r="2.5" fill="url(#alg)"/>
           <circle cx="24" cy="18" r="2.5" fill="url(#alg)"/>
@@ -587,7 +587,10 @@
       <!-- Verification code step (shown after register) -->
       <div id="verifyCodeStep" class="auth-form hidden">
         <p class="auth-desc" id="verifyCodeDesc">Introduce el código de 6 dígitos enviado a tu email.</p>
-        <div class="verify-code-display hidden" id="devCodeDisplay"></div>
+        <div class="verify-code-display hidden" id="devCodeDisplay">
+          <div style="font-size:11px;margin-bottom:6px;opacity:.7">Código de verificación (sin email configurado):</div>
+          <div id="devCodeValue" style="font-size:36px;font-weight:900;letter-spacing:12px"></div>
+        </div>
         <div class="auth-field">
           <label data-i18n="auth.code">Código de verificación</label>
           <input type="text" id="verifyCodeInput" class="auth-input code-input"
@@ -607,10 +610,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- Google Identity Services (solo si GOOGLE_CLIENT_ID está configurado) -->
 <script src="https://accounts.google.com/gsi/client" async></script>
-<!-- ?v=13 busts Netlify CDN cache -->
-<script src="/js/config.js?v=13"></script>
-<script src="/js/i18n.js?v=13"></script>
-<script src="/js/app.js?v=13"></script>
+<!-- ?v=14 busts Netlify CDN cache -->
+<script src="/js/config.js?v=14"></script>
+<script src="/js/i18n.js?v=14"></script>
+<script src="/js/app.js?v=14"></script>
 
 </body>
 </html>

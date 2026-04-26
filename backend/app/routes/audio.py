@@ -92,13 +92,13 @@ def list_audios(
     result = []
     try:
         try:
-            q = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500)
+            # filter() DEBE ir antes de limit() en SQLAlchemy
+            q = db.query(Audio).order_by(Audio.uploaded_at.desc())
             if current_user:
                 q = q.filter(Audio.user_id == current_user.id)
             elif session_id:
-                # Invitado: audios de esta sesión (user_id nulo o coincide sesión)
                 q = q.filter(Audio.session_id == session_id)
-            audios = q.all()
+            audios = q.limit(500).all()
         except Exception as _fe:
             logger.warning(f"Filtro de usuario falló ({_fe}), devolviendo todos")
             audios = db.query(Audio).order_by(Audio.uploaded_at.desc()).limit(500).all()

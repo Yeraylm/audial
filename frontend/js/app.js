@@ -984,13 +984,14 @@ async function _doRegister(e) {
 
     const descEl = $('#verifyCodeDesc');
     const devDisplay = $('#devCodeDisplay');
+    const devCodeVal = $('#devCodeValue');
     if (data.email_sent) {
       if (descEl) descEl.textContent = t('auth.code_sent_email');
       devDisplay?.classList.add('hidden');
     } else {
-      if (descEl) descEl.textContent = t('auth.code_dev');
+      if (descEl) descEl.textContent = '⚠️ No hay servicio de email configurado. Tu código es:';
       if (devDisplay && data.dev_code) {
-        devDisplay.textContent = `🔑 ${data.dev_code}`;
+        if (devCodeVal) devCodeVal.textContent = data.dev_code;
         devDisplay.classList.remove('hidden');
       }
     }
