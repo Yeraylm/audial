@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Audial · Plataforma IA Conversacional</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' x2='1' y2='1'><stop offset='0' stop-color='%23F5A623'/><stop offset='1' stop-color='%23E85A4F'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><path d='M8 20 Q16 8 24 20' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/><circle cx='8' cy='20' r='2' fill='%23fff'/><circle cx='24' cy='20' r='2' fill='%23fff'/></svg>" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' x2='1' y2='1'><stop offset='0' stop-color='%2339FF14'/><stop offset='1' stop-color='%2300E5CC'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23050a05'/><rect width='32' height='32' rx='8' fill='url(%23g)' opacity='0.15'/><path d='M8 20 Q16 8 24 20' stroke='url(%23g)' stroke-width='2.5' fill='none' stroke-linecap='round'/><circle cx='8' cy='20' r='2.5' fill='%2339FF14'/><circle cx='24' cy='20' r='2.5' fill='%2300E5CC'/><path d='M11 20 Q16 13 21 20' stroke='%2339FF14' stroke-width='1.5' fill='none' stroke-linecap='round' opacity='0.5'/></svg>" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
@@ -32,10 +32,10 @@
     <a class="navbar-brand d-flex align-items-center gap-2 magnetic" href="#" onclick="showPage('upload');return false;">
       <div class="logo-wrap">
         <svg viewBox="0 0 28 28" width="20" height="20">
-          <defs><linearGradient id="lg" x1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5A623"/><stop offset="1" stop-color="#E85A4F"/></linearGradient></defs>
+          <defs><linearGradient id="lg" x1="0" x2="1" y2="1"><stop offset="0" stop-color="#39FF14"/><stop offset="1" stop-color="#00E5CC"/></linearGradient></defs>
           <path d="M4 18 Q14 4 24 18" stroke="url(#lg)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-          <circle cx="4" cy="18" r="2.5" fill="url(#lg)"/>
-          <circle cx="24" cy="18" r="2.5" fill="url(#lg)"/>
+          <circle cx="4" cy="18" r="2.5" fill="#39FF14"/>
+          <circle cx="24" cy="18" r="2.5" fill="#00E5CC"/>
           <path d="M8 18 Q14 10 20 18" stroke="url(#lg)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5"/>
         </svg>
       </div>
@@ -54,6 +54,11 @@
         <li class="nav-item"><a class="nav-link nav-pill" data-page="dashboard" href="#"><i data-lucide="bar-chart-3" class="nav-icon"></i> <span data-i18n="nav.dashboard">Dashboard</span></a></li>
         <li class="nav-item"><a class="nav-link nav-pill" data-page="chat" href="#"><i data-lucide="message-square" class="nav-icon"></i> <span data-i18n="nav.chat">Asistente</span></a></li>
         <li class="nav-item"><a class="nav-link nav-pill text-muted" href="https://yeray22-audial-backend.hf.space/docs" target="_blank"><i data-lucide="book-open" class="nav-icon"></i> <span data-i18n="nav.api">API</span></a></li>
+        <li class="nav-item hidden" id="navAdminItem">
+          <a class="nav-link nav-pill nav-pill-admin" data-page="admin" href="#">
+            <i data-lucide="shield" class="nav-icon"></i> <span>Admin BD</span>
+          </a>
+        </li>
         <li class="nav-item ms-lg-2">
           <div class="lang-switch">
             <button data-lang-btn="es" onclick="i18n.setLang('es')">ES</button>
@@ -368,6 +373,129 @@
   </div>
 </section>
 
+<!-- ============ ADMIN BD ============ -->
+<section class="page" id="page-admin">
+  <div class="mb-4">
+    <div class="section-label">Área privada</div>
+    <h1 class="page-title">Panel de administración BD</h1>
+    <p class="text-muted">Acceso restringido a <span class="role-chip owner">👑 owner</span> y <span class="role-chip admin">🔑 admin</span></p>
+  </div>
+
+  <!-- Admin sub-tabs -->
+  <ul class="nav-tabs-custom mb-4" id="adminSubTabs">
+    <li><button class="tab-btn active" data-atab="overview"><i data-lucide="layout-dashboard" class="nav-icon"></i> Resumen</button></li>
+    <li><button class="tab-btn" data-atab="users"><i data-lucide="users" class="nav-icon"></i> Usuarios y roles</button></li>
+    <li><button class="tab-btn" data-atab="tables"><i data-lucide="table" class="nav-icon"></i> Tablas</button></li>
+    <li><button class="tab-btn" data-atab="sql"><i data-lucide="terminal" class="nav-icon"></i> SQL</button></li>
+  </ul>
+
+  <!-- Overview -->
+  <div class="atab-panel active" data-atab="overview">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3 style="font-size:17px;font-weight:700">Estadísticas de tablas</h3>
+      <button class="btn btn-outline-accent btn-sm" onclick="adminLoadOverview()">↻ Actualizar</button>
+    </div>
+    <div id="adminStatsGrid" class="row g-3 mb-4"></div>
+    <h3 class="mb-3" style="font-size:15px;font-weight:700">Acciones rápidas</h3>
+    <div class="row g-2">
+      <div class="col-auto"><button class="btn btn-outline-accent btn-sm" onclick="adminShowTable('users')"><i data-lucide="users" class="nav-icon"></i> Usuarios</button></div>
+      <div class="col-auto"><button class="btn btn-outline-accent btn-sm" onclick="adminShowTable('audios')"><i data-lucide="music-2" class="nav-icon"></i> Audios</button></div>
+      <div class="col-auto"><button class="btn btn-outline-accent btn-sm" onclick="adminShowTable('analyses')"><i data-lucide="brain" class="nav-icon"></i> Análisis</button></div>
+      <div class="col-auto"><button class="btn btn-outline-accent btn-sm" onclick="adminShowTable('jobs')"><i data-lucide="settings" class="nav-icon"></i> Jobs</button></div>
+      <div class="col-auto"><button class="btn btn-danger-outline btn-sm" onclick="adminCleanGuests()"><i data-lucide="trash-2" class="nav-icon"></i> Limpiar invitados expirados</button></div>
+    </div>
+  </div>
+
+  <!-- Users & roles -->
+  <div class="atab-panel" data-atab="users">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h3 style="font-size:17px;font-weight:700">Usuarios y roles</h3>
+        <div class="d-flex gap-2 mt-1 flex-wrap">
+          <span class="role-chip owner">👑 owner — único, control total</span>
+          <span class="role-chip admin">🔑 admin — acceso al panel</span>
+          <span class="role-chip user">👤 user — usuario estándar</span>
+        </div>
+      </div>
+      <button class="btn btn-outline-accent btn-sm" onclick="adminLoadUsers()">↻ Actualizar</button>
+    </div>
+    <div class="adm-table-wrap">
+      <table class="adm-table-inline">
+        <thead><tr><th>Email</th><th>Nombre</th><th>Rol</th><th>Verificado</th><th>Creado</th><th>Cambiar rol</th><th></th></tr></thead>
+        <tbody id="adminUserTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tables browser -->
+  <div class="atab-panel" data-atab="tables">
+    <div class="row g-3">
+      <div class="col-lg-3">
+        <div class="glass-card">
+          <div class="small-label mb-2">Tablas</div>
+          <div id="adminTableList" class="d-flex flex-column gap-1"></div>
+        </div>
+      </div>
+      <div class="col-lg-9">
+        <div class="glass-card">
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h4 id="adminTableTitle" style="font-size:15px;font-weight:700">Selecciona una tabla</h4>
+            <div class="d-flex gap-2 align-items-center">
+              <input id="adminTableSearch" class="search-input-field" style="width:160px" placeholder="Buscar…" oninput="adminFilterTable()"/>
+              <button class="btn btn-outline-accent btn-sm" id="adminPrevBtn" onclick="adminChangePage(-1)">‹</button>
+              <span id="adminPageInfo" class="text-muted" style="font-size:12px;white-space:nowrap"></span>
+              <button class="btn btn-outline-accent btn-sm" id="adminNextBtn" onclick="adminChangePage(1)">›</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="adm-table-inline" id="adminMainTable">
+              <thead id="adminTHead"></thead>
+              <tbody id="adminTBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SQL editor -->
+  <div class="atab-panel" data-atab="sql">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h3 style="font-size:17px;font-weight:700">⌨ Editor SQL</h3>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-accent btn-sm" onclick="adminClearSql()">Limpiar</button>
+        <button class="btn btn-primary-gradient" onclick="adminRunSql()">▶ Ejecutar <small style="opacity:.7">(Ctrl+Enter)</small></button>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <button class="sql-quick-btn" onclick="adminSetSql('SELECT u.email, r.name as role, u.is_verified, u.created_at FROM users u LEFT JOIN roles r ON u.role_id=r.id ORDER BY u.created_at DESC')">usuarios+roles</button>
+      <button class="sql-quick-btn" onclick="adminSetSql('SELECT id, filename, duration_sec, uploaded_at, user_id FROM audios ORDER BY uploaded_at DESC LIMIT 50')">audios recientes</button>
+      <button class="sql-quick-btn" onclick="adminSetSql('SELECT id, audio_id, status, stage, message FROM jobs ORDER BY id DESC LIMIT 30')">jobs</button>
+      <button class="sql-quick-btn" onclick="adminSetSql('SELECT COUNT(*) total, CASE WHEN user_id IS NULL THEN \'invitado\' ELSE \'registrado\' END tipo FROM audios GROUP BY tipo')">audios por tipo</button>
+      <button class="sql-quick-btn" onclick="adminSetSql('SELECT * FROM roles ORDER BY id')">roles</button>
+    </div>
+    <textarea id="adminSqlEditor" class="admin-sql-editor" placeholder="SELECT * FROM users; -- Ctrl+Enter para ejecutar" spellcheck="false"></textarea>
+    <div id="adminSqlResult" class="hidden mt-3"></div>
+  </div>
+
+  <!-- Edit row modal (inline) -->
+  <div class="adm-modal-overlay hidden" id="adminEditModal">
+    <div class="adm-modal">
+      <div class="adm-modal-header">
+        <h3 id="adminEditTitle">Editar</h3>
+        <button onclick="$('#adminEditModal').classList.add('hidden')">✕</button>
+      </div>
+      <div id="adminEditBody" class="adm-modal-body"></div>
+      <div class="adm-modal-footer">
+        <button class="adm-btn-danger" id="adminDeleteBtn">🗑 Eliminar</button>
+        <button class="adm-btn-sm" onclick="$('#adminEditModal').classList.add('hidden')">Cancelar</button>
+        <button class="adm-btn-primary" onclick="adminSaveRow()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
 </main>
 
 <footer class="site-footer">
@@ -479,10 +607,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- Google Identity Services (solo si GOOGLE_CLIENT_ID está configurado) -->
 <script src="https://accounts.google.com/gsi/client" async></script>
-<!-- ?v=12 busts Netlify CDN cache -->
-<script src="/js/config.js?v=12"></script>
-<script src="/js/i18n.js?v=12"></script>
-<script src="/js/app.js?v=12"></script>
+<!-- ?v=13 busts Netlify CDN cache -->
+<script src="/js/config.js?v=13"></script>
+<script src="/js/i18n.js?v=13"></script>
+<script src="/js/app.js?v=13"></script>
 
 </body>
 </html>

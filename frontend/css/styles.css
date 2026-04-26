@@ -775,6 +775,103 @@ canvas { max-height:260px !important; }
 ::selection { background:rgba(57,255,20,.4);color:white; }
 
 /* ============================================================
+   ADMIN PANEL — integrado en el SPA principal
+   ============================================================ */
+.nav-pill-admin {
+  background: linear-gradient(135deg, rgba(57,255,20,.12), rgba(0,229,204,.08)) !important;
+  border: 1px solid rgba(57,255,20,.25) !important;
+  color: var(--amber-lt) !important;
+}
+.nav-pill-admin.active { background: var(--grad-primary) !important; color: #050a05 !important; }
+
+.role-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+}
+.role-chip.owner { background: rgba(255,215,0,.12); color: #FFD700; border: 1px solid rgba(255,215,0,.2); }
+.role-chip.admin { background: rgba(57,255,20,.1);  color: var(--amber-lt); border: 1px solid rgba(57,255,20,.2); }
+.role-chip.user  { background: rgba(0,229,204,.08); color: var(--coral-lt); border: 1px solid rgba(0,229,204,.2); }
+
+.atab-panel { display: none; }
+.atab-panel.active { display: block; animation: tabReveal .25s ease both; }
+
+/* Inline admin table */
+.adm-table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: auto; max-height: 520px; }
+.adm-table-inline {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.adm-table-inline th {
+  background: var(--bg-3); padding: 9px 12px; text-align: left;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--tx-2); border-bottom: 1px solid var(--border);
+  white-space: nowrap; position: sticky; top: 0; z-index: 2;
+}
+.adm-table-inline td {
+  padding: 8px 12px; border-bottom: 1px solid rgba(57,255,20,.04);
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.adm-table-inline tr:hover td { background: rgba(57,255,20,.03); }
+.adm-table-inline tr:last-child td { border-bottom: none; }
+.adm-null { color: var(--tx-3); font-style: italic; }
+.adm-yes  { color: var(--amber-lt); font-weight: 700; }
+.adm-no   { color: var(--tx-3); }
+.adm-edit-btn {
+  background: none; border: none; color: var(--tx-3); cursor: pointer;
+  padding: 3px 7px; border-radius: 5px; font-size: 13px; transition: all .15s;
+}
+.adm-edit-btn:hover { color: var(--amber-lt); background: rgba(57,255,20,.08); }
+
+/* Admin table list buttons */
+.admin-tbl-btn {
+  background: transparent; border: none; color: var(--tx-2);
+  text-align: left; padding: 7px 10px; border-radius: 8px; font-size: 13px;
+  cursor: pointer; width: 100%; display: flex; justify-content: space-between; transition: all .15s;
+}
+.admin-tbl-btn:hover { background: rgba(57,255,20,.06); color: var(--tx-1); }
+.admin-tbl-btn.active { background: rgba(57,255,20,.12); color: var(--amber-lt); font-weight: 600; }
+.admin-tbl-count { font-size: 11px; background: rgba(57,255,20,.1); padding: 1px 7px; border-radius: 999px; color: var(--amber-lt); }
+
+/* Role select */
+.admin-role-sel {
+  background: var(--bg-3); border: 1px solid var(--border); color: var(--tx-1);
+  padding: 4px 8px; border-radius: 7px; font-size: 12px; cursor: pointer;
+}
+
+/* SQL editor inline */
+.admin-sql-editor {
+  width: 100%; min-height: 140px; max-height: 260px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--amber-lt); font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 13.5px; padding: 14px; border-radius: 10px; resize: vertical; outline: none;
+}
+.admin-sql-editor:focus { border-color: var(--amber); }
+.sql-quick-btn {
+  background: rgba(57,255,20,.06); border: 1px solid var(--border);
+  color: var(--amber-lt); font-size: 12px; padding: 4px 12px;
+  border-radius: 999px; cursor: pointer; transition: all .15s;
+}
+.sql-quick-btn:hover { background: rgba(57,255,20,.14); }
+.sql-result-box {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.sql-result-info {
+  background: var(--bg-3); padding: 8px 14px;
+  font-size: 12px; color: var(--tx-2); border-bottom: 1px solid var(--border);
+}
+.sql-result-err {
+  background: rgba(0,229,204,.06); padding: 12px; color: var(--coral-lt);
+  font-family: monospace; font-size: 13px;
+}
+.btn-danger-outline {
+  background: transparent; border: 1px solid rgba(0,229,204,.3);
+  color: var(--coral-lt); padding: 7px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;
+  transition: all .2s; cursor: pointer;
+}
+.btn-danger-outline:hover { background: rgba(0,229,204,.08); }
+
+/* ============================================================
    RESPONSIVE — tablet (≤ 992px)
    ============================================================ */
 @media (max-width:992px) {

@@ -20,14 +20,19 @@ function _setAuth(token, user) {
 
 function _updateUserNav() {
   const avatar = $('#userAvatar'), nameEl = $('#userNavName'), emailEl = $('#userMenuEmail');
+  const adminItem = $('#navAdminItem');
   if (_authUser) {
-    if (avatar) { avatar.textContent = (_authUser.display_name || _authUser.email || '?')[0].toUpperCase(); }
+    if (avatar) avatar.textContent = (_authUser.display_name || _authUser.email || '?')[0].toUpperCase();
     if (nameEl)  nameEl.textContent = _authUser.display_name || _authUser.email || '';
     if (emailEl) emailEl.textContent = _authUser.email || '';
+    // Mostrar nav Admin solo para owner/admin
+    const isAdmin = _authUser.role === 'owner' || _authUser.role === 'admin';
+    adminItem?.classList.toggle('hidden', !isAdmin);
   } else {
     if (avatar)  avatar.textContent = '?';
     if (nameEl)  nameEl.textContent = t('auth.guest.short');
     if (emailEl) emailEl.textContent = '';
+    adminItem?.classList.add('hidden');
   }
 }
 
@@ -281,6 +286,7 @@ window.showPage = function(name) {
 
   if (name === 'dashboard')     refreshDashboard();
   if (name === 'conversations') refreshAudios();
+  if (name === 'admin')         { adminLoadOverview(); adminSwitchTab('overview'); }
 
   i18n.applyTranslations();
   refreshIcons();
@@ -935,7 +941,7 @@ async function _doLogin(e) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Error');
-    _setAuth(data.token, { email: data.email, display_name: data.display_name });
+    _setAuth(data.token, { email: data.email, display_name: data.display_name, role: data.role || 'user' });
     _getAuthModal()?.hide();
     refreshAudios(); refreshDashboard();
   } catch (err) {
@@ -1094,7 +1100,7 @@ window.handleGoogleCredential = async function(response) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Error Google auth');
-    _setAuth(data.token, { email: data.email, display_name: data.display_name });
+    _setAuth(data.token, { email: data.email, display_name: data.display_name, role: data.role || 'user' });
     _getAuthModal()?.hide();
     refreshAudios(); refreshDashboard();
   } catch (err) {
@@ -1148,6 +1154,228 @@ async function translateAndRender(audioId, targetLang) {
     $('#translatingBadge')?.remove();
   }
 }
+
+/* ============================================================
+   ADMIN BD — integrado en el SPA (solo owner/admin)
+   ============================================================ */
+let _adminCurrentTable = '', _adminPage = 1, _adminCols = [], _adminRows = [], _adminEditRow = null, _adminPk = '';
+const ADMIN_PAGE_SIZE = 50;
+
+function _adminToken() { return _authToken || ''; }
+
+async function adFetch(url, opts = {}) {
+  opts.headers = { ...(opts.headers || {}), 'X-Admin-Token': _adminToken() };
+  return fetch(url, opts);
+}
+
+async function adminLoadOverview() {
+  const r = await adFetch(`${API}/api/admin/stats`);
+  if (!r.ok) return;
+  const stats = await r.json();
+  const icons = { users:'👤', audios:'🎙', jobs:'⚙️', transcripts:'📝', analyses:'🧠', embeddings_index:'🔍', roles:'🎖' };
+  const grid = $('#adminStatsGrid');
+  if (!grid) return;
+  grid.innerHTML = Object.entries(stats).map(([k,v]) => `
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="kpi-tile" onclick="adminShowTable('${k}'); adminSwitchTab('tables')" style="cursor:pointer">
+        <div class="kpi-icon"><span style="font-size:18px">${icons[k]||'📦'}</span></div>
+        <div class="kpi-n">${v}</div>
+        <div class="kpi-l">${k}</div>
+      </div>
+    </div>`).join('');
+  // Also load table list
+  const listR = await adFetch(`${API}/api/admin/tables`);
+  const tables = await listR.json();
+  const tlist = $('#adminTableList');
+  if (tlist) tlist.innerHTML = tables.map(t => `
+    <button class="admin-tbl-btn" onclick="adminShowTable('${t.table}'); adminSwitchTab('tables')">
+      ${esc(t.table)} <span class="admin-tbl-count">${t.count}</span>
+    </button>`).join('');
+}
+
+async function adminLoadUsers() {
+  const r = await adFetch(`${API}/api/admin/users`);
+  if (!r.ok) return;
+  const users = await r.json();
+  const isOwner = _authUser?.role === 'owner';
+  const tbody = $('#adminUserTableBody');
+  if (!tbody) return;
+  const ROLE_LABELS = { 1:'<span class="role-chip owner">👑 owner</span>', 2:'<span class="role-chip admin">🔑 admin</span>', 3:'<span class="role-chip user">👤 user</span>' };
+  tbody.innerHTML = users.map(u => {
+    const opts = [1,2,3].map(rid =>
+      `<option value="${rid}" ${u.role_id===rid?'selected':''} ${rid===1&&!isOwner?'disabled':''}>${rid===1?'👑 owner':rid===2?'🔑 admin':'👤 user'}</option>`
+    ).join('');
+    return `<tr>
+      <td>${esc(u.email)}</td>
+      <td>${esc(u.display_name||'–')}</td>
+      <td>${ROLE_LABELS[u.role_id]||u.role_name}</td>
+      <td>${u.is_verified?'<span class="adm-yes">✓</span>':'<span class="adm-no">✗</span>'}</td>
+      <td>${u.created_at?new Date(u.created_at).toLocaleDateString('es-ES'):'–'}</td>
+      <td><select class="admin-role-sel" onchange="adminChangeRole('${u.id}',this.value)">${opts}</select></td>
+      <td>${u.role_id!==1?`<button class="adm-edit-btn" onclick="adminDeleteUser('${u.id}','${esc(u.email)}')" title="Eliminar">🗑</button>`:''}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--tx-3);padding:20px">Sin usuarios</td></tr>';
+}
+
+async function adminChangeRole(userId, newRoleId) {
+  const r = await adFetch(`${API}/api/admin/users/${userId}/role`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role_id: parseInt(newRoleId) }),
+  });
+  if (r.ok) { adminLoadUsers(); adminLoadOverview(); }
+  else { const d = await r.json(); alert('Error: ' + (d.detail||'No se pudo cambiar el rol')); adminLoadUsers(); }
+}
+
+async function adminDeleteUser(userId, email) {
+  if (!confirm(`¿Eliminar usuario ${email}?`)) return;
+  const r = await adFetch(`${API}/api/admin/users/${userId}`, { method: 'DELETE' });
+  if (r.ok) adminLoadUsers(); else alert('Error eliminando usuario');
+}
+
+async function adminShowTable(table) {
+  _adminCurrentTable = table; _adminPage = 1;
+  const srch = $('#adminTableSearch'); if (srch) srch.value = '';
+  $$('.admin-tbl-btn').forEach(b => b.classList.toggle('active', b.textContent.trim().startsWith(table)));
+  await _adminLoadTablePage();
+  const title = $('#adminTableTitle'); if (title) title.textContent = `📋 ${table}`;
+}
+
+async function _adminLoadTablePage() {
+  const r = await adFetch(`${API}/api/admin/tables/${_adminCurrentTable}?page=${_adminPage}&page_size=${ADMIN_PAGE_SIZE}`);
+  if (!r.ok) return;
+  const data = await r.json();
+  _adminCols = data.columns; _adminRows = data.rows; _adminPk = _adminCols[0];
+  const pi = $('#adminPageInfo');
+  if (pi) pi.textContent = `${_adminPage}/${Math.ceil(data.total/ADMIN_PAGE_SIZE)||1} · ${data.total} reg.`;
+  const prev = $('#adminPrevBtn'), next = $('#adminNextBtn');
+  if (prev) prev.disabled = _adminPage <= 1;
+  if (next) next.disabled = data.rows.length < ADMIN_PAGE_SIZE;
+  _adminRenderTable(_adminCols, _adminRows);
+}
+
+function _adminRenderTable(cols, rows) {
+  const thead = $('#adminTHead'), tbody = $('#adminTBody');
+  if (!thead || !tbody) return;
+  thead.innerHTML = '<tr><th></th>' + cols.map(c=>`<th>${esc(c)}</th>`).join('') + '</tr>';
+  tbody.innerHTML = rows.map((row,idx) =>
+    `<tr><td><button class="adm-edit-btn" onclick="adminOpenEdit(${idx})">✏</button></td>
+     ${cols.map(c=>`<td title="${esc(row[c])}">${_adminCell(row[c])}</td>`).join('')}</tr>`
+  ).join('') || '<tr><td colspan="99" style="text-align:center;color:var(--tx-3);padding:20px">Sin registros</td></tr>';
+}
+
+function adminFilterTable() {
+  const q = ($('#adminTableSearch')?.value||'').toLowerCase();
+  _adminRenderTable(_adminCols, q ? _adminRows.filter(r=>Object.values(r).some(v=>String(v??'').toLowerCase().includes(q))) : _adminRows);
+}
+
+function adminChangePage(dir) { _adminPage = Math.max(1,_adminPage+dir); _adminLoadTablePage(); }
+
+function adminOpenEdit(idx) {
+  _adminEditRow = {..._adminRows[idx]};
+  const pkVal = _adminEditRow[_adminPk];
+  const modal = $('#adminEditModal'), title = $('#adminEditTitle'), body = $('#adminEditBody');
+  if (!modal) return;
+  title.textContent = `✏ ${_adminPk} = ${pkVal}`;
+  body.innerHTML = _adminCols.map(col => {
+    const isPk = col === _adminPk, val = _adminEditRow[col] ?? '';
+    const long = String(val).length > 80;
+    const field = long
+      ? `<textarea rows="3" id="aedit_${col}" ${isPk?'readonly':''}>${esc(String(val))}</textarea>`
+      : `<input type="text" id="aedit_${col}" value="${esc(String(val))}" ${isPk?'readonly':''}/>`
+    return `<div class="adm-field ${isPk?'pk-field':''}"><label>${esc(col)}${isPk?' (PK)':''}</label>${field}</div>`;
+  }).join('');
+  const delBtn = $('#adminDeleteBtn');
+  if (delBtn) delBtn.onclick = () => adminDeleteRow(pkVal);
+  modal.classList.remove('hidden');
+}
+
+async function adminSaveRow() {
+  if (!_adminEditRow) return;
+  const pkVal = _adminEditRow[_adminPk];
+  const data = {};
+  _adminCols.forEach(col => { if (col !== _adminPk) { const el = $(`#aedit_${col}`); if (el) data[col] = el.value; } });
+  const r = await adFetch(`${API}/api/admin/tables/${_adminCurrentTable}/${pkVal}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }),
+  });
+  if (r.ok) { $('#adminEditModal')?.classList.add('hidden'); _adminLoadTablePage(); adminLoadOverview(); }
+  else { const d = await r.json(); alert('Error: ' + (d.detail||'desconocido')); }
+}
+
+async function adminDeleteRow(pkVal) {
+  if (!confirm(`¿Eliminar ${_adminPk} = ${pkVal}?`)) return;
+  const r = await adFetch(`${API}/api/admin/tables/${_adminCurrentTable}/${pkVal}`, { method: 'DELETE' });
+  if (r.ok) { $('#adminEditModal')?.classList.add('hidden'); _adminLoadTablePage(); adminLoadOverview(); }
+  else alert('Error eliminando');
+}
+
+async function adminRunSql() {
+  const sql = $('#adminSqlEditor')?.value?.trim(); if (!sql) return;
+  const res = $('#adminSqlResult'); if (!res) return;
+  res.classList.remove('hidden');
+  res.innerHTML = '<div class="sql-result-box"><div class="sql-result-info">Ejecutando…</div></div>';
+  try {
+    const r = await adFetch(`${API}/api/admin/sql`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail);
+    if (d.type === 'select') {
+      const info = `<div class="sql-result-info">${d.count} fila(s)</div>`;
+      if (!d.rows.length) { res.innerHTML = `<div class="sql-result-box">${info}<div style="padding:12px;color:var(--tx-3)">Sin resultados</div></div>`; return; }
+      const thead = '<tr>'+d.columns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
+      const tbody = d.rows.map(row=>'<tr>'+d.columns.map(c=>`<td>${_adminCell(row[c])}</td>`).join('')+'</tr>').join('');
+      res.innerHTML = `<div class="sql-result-box">${info}<div style="overflow-x:auto"><table class="adm-table-inline">${thead}${tbody}</table></div></div>`;
+    } else {
+      res.innerHTML = `<div class="sql-result-box"><div class="sql-result-info">✓ ${d.rowcount} fila(s) afectada(s)</div></div>`;
+      adminLoadOverview();
+    }
+  } catch(e) {
+    res.innerHTML = `<div class="sql-result-box"><div class="sql-result-err">Error: ${esc(e.message)}</div></div>`;
+  }
+}
+
+function adminClearSql() { const e=$('#adminSqlEditor'); if(e) e.value=''; const r=$('#adminSqlResult'); if(r) r.classList.add('hidden'); }
+function adminSetSql(sql) { adminSwitchTab('sql'); const e=$('#adminSqlEditor'); if(e){ e.value=sql; e.focus(); } }
+
+async function adminCleanGuests() {
+  if (!confirm('¿Eliminar todos los audios de invitados expirados?')) return;
+  adminSetSql("DELETE FROM audios WHERE user_id IS NULL AND expires_at IS NOT NULL AND expires_at < NOW()");
+  await adminRunSql();
+  adminLoadOverview();
+}
+
+function adminSwitchTab(tab) {
+  $$('#adminSubTabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.atab === tab));
+  $$('.atab-panel').forEach(p => p.classList.toggle('active', p.dataset.atab === tab));
+  if (tab === 'overview') adminLoadOverview();
+  if (tab === 'users') adminLoadUsers();
+  refreshIcons();
+}
+
+function _adminCell(v) {
+  if (v===null||v===undefined) return '<span class="adm-null">NULL</span>';
+  if (v===1||v===true)  return '<span class="adm-yes">✓</span>';
+  if (v===0||v===false) return '<span class="adm-no">✗</span>';
+  const s=String(v); return s.length>60?`<span title="${esc(s)}">${esc(s.slice(0,60))}…</span>`:esc(s);
+}
+
+// SQL editor keyboard shortcut
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='Enter' && document.activeElement?.id==='adminSqlEditor') {
+    e.preventDefault(); adminRunSql();
+  }
+});
+
+// Click outside closes edit modal
+document.getElementById('adminEditModal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('adminEditModal')) document.getElementById('adminEditModal')?.classList.add('hidden');
+});
+
+// Admin sub-tabs
+document.addEventListener('click', e => {
+  const btn = e.target.closest('#adminSubTabs .tab-btn');
+  if (btn?.dataset.atab) adminSwitchTab(btn.dataset.atab);
+});
 
 /* ============================================================
    BOOT — event listeners centralizados (sin onclick inline)
