@@ -243,6 +243,7 @@ $$('[data-audio-lang]').forEach(btn => {
 // Re-render everything when language changes
 window.addEventListener('langchange', () => {
   i18n.applyTranslations();
+  _updateUserNav();   // restaurar nombre de usuario tras traducción
   refreshIcons();
 
   // Re-render dynamic content on the currently visible page
@@ -294,6 +295,7 @@ window.showPage = function(name) {
   }, 80);
 
   i18n.applyTranslations();
+  _updateUserNav();   // restaurar nombre de usuario (applyTranslations puede sobreescribirlo)
   refreshIcons();
 };
 
