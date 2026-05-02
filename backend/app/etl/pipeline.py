@@ -100,6 +100,8 @@ def process_single_audio(
 
         tr = whisper_service.transcribe(audio.filepath, language=language)
         audio.duration_sec = tr.duration
+        # Commitear duración ANTES del próximo _update_job (que hace rollback)
+        db.commit()
         segments = tr.segments
 
         # ---- Diarización ----

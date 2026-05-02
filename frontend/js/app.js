@@ -255,10 +255,8 @@ window.addEventListener('langchange', () => {
   } else if (pageId === 'page-dashboard') {
     refreshDashboard();
   } else if (pageId === 'page-detail' && currentAudioId) {
-    // Traduce el análisis en el nuevo idioma via backend (Groq)
     const newLang = window.i18n?.lang || 'es';
     translateAndRender(currentAudioId, newLang);
-    // Actualizar etiquetas estáticas
     const cnt = $('#transcriptCount');
     if (cnt) { const n = $$('.segment-row').length; if (n) cnt.textContent = `${n} ${t('transcript.count')}`; }
   } else if (pageId === 'page-chat') {
@@ -531,8 +529,10 @@ window.openAudio = async function(id) {
     playerBar.style.display = 'flex';
   }
 
+  // Pasar idioma UI para obtener el análisis ya en el idioma correcto
+  const uiLang = window.i18n?.lang || 'es';
   const [aRes, tRes] = await Promise.all([
-    fetch(`${API}/api/analysis/${id}`),
+    fetch(`${API}/api/analysis/${id}?lang=${uiLang}`),
     fetch(`${API}/api/analysis/${id}/transcript`),
   ]);
 
@@ -551,7 +551,8 @@ window.openAudio = async function(id) {
   }
 
   const [a, tr] = await Promise.all([aRes.json(), tRes.json()]);
-  if (titleEl)  titleEl.textContent  = a.summary_short?.slice(0,50) + (a.summary_short?.length > 50 ? '…' : '') || id.slice(0,8);
+  const titleText = (a.summary_short || '').slice(0, 50) + (a.summary_short?.length > 50 ? '…' : '');
+  if (titleEl)  titleEl.textContent  = titleText || id.slice(0, 8);
   if (headerEl) headerEl.textContent = t('detail.title');
 
   // Actualizar nombre en el reproductor
@@ -760,7 +761,10 @@ async function loadRelated(id) {
   try {
     const r = await fetch(`${API}/api/dashboard/related/${id}`);
     const items = r.ok ? await r.json() : [];
-    if (!items.length) { rl.innerHTML = `<p class="text-muted small">${t('related.empty')}</p>`; return; }
+    if (!items.length) {
+      rl.innerHTML = `<p class="text-muted small">${t('related.empty')}</p>`;
+      return;
+    }
     rl.innerHTML = items.map(x => `
       <div class="related-card" onclick="openAudio('${x.audio_id}')">
         <span class="related-score">${(x.score*100).toFixed(0)}%</span>
@@ -768,7 +772,10 @@ async function loadRelated(id) {
         <i data-lucide="arrow-right" style="color:var(--tx-3);width:16px;height:16px"></i>
       </div>`).join('');
     refreshIcons();
-  } catch {}
+  } catch {
+    const rl2 = $('#relatedList');
+    if (rl2) rl2.innerHTML = `<p class="text-muted small">${t('related.empty')}</p>`;
+  }
 }
 
 function destroyChart(k) { if (charts[k]) { try { charts[k].destroy(); } catch {} delete charts[k]; } }
@@ -802,7 +809,7 @@ async function refreshDashboard() {
       ];
       kpiRow.innerHTML = items.map(it => `
         <div class="col-md-6 col-lg-3">
-          <div class="kpi-tile reveal">
+          <div class="kpi-tile">
             <div class="kpi-icon"><i data-lucide="${it.icon}"></i></div>
             <div class="kpi-n" data-target="${it.n}" data-suf="${it.suf||''}">0</div>
             <div class="kpi-l">${esc(it.l)}</div>
@@ -1135,7 +1142,6 @@ function _initGoogleAuth() {
    DYNAMIC TRANSLATION when lang changes on detail page
    ============================================================ */
 async function translateAndRender(audioId, targetLang) {
-  // Show translating indicator
   const panel = $('.tab-panel[data-tab="summary"]');
   if (panel) {
     const badge = document.createElement('div');
@@ -1150,6 +1156,12 @@ async function translateAndRender(audioId, targetLang) {
     if (!r.ok) return;
     const a = await r.json();
     window._lastAnalysis = a;
+
+    // Actualizar título de la conversación con el idioma nuevo
+    const titleText = (a.summary_short || '').slice(0, 50) + (a.summary_short?.length > 50 ? '…' : '');
+    const titleEl = $('#detailTitle');
+    if (titleEl && titleText) titleEl.textContent = titleText;
+
     safe(() => renderSummary(a));
     safe(() => renderEntities(a.entities));
     safe(() => renderTasks(a.tasks, a.decisions, a.questions));
@@ -1157,6 +1169,7 @@ async function translateAndRender(audioId, targetLang) {
     safe(() => renderTopics(a.topics, a.intents));
     safe(() => renderTimeline(a.timeline));
     safe(() => renderMetrics(a.metrics));
+    safe(() => loadRelated(audioId));  // recargar relacionados con etiquetas traducidas
     refreshIcons();
   } finally {
     $('#translatingBadge')?.remove();
