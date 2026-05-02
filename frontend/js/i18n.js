@@ -119,6 +119,9 @@ const TRANSLATIONS = {
     'dashboard.kpi.tasks':     'Tareas extraídas',
     'dashboard.chart.sentiment':'Distribución de sentimiento',
     'dashboard.chart.totals':   'Totales extraídos',
+    'dashboard.chart.tasks':    'Tareas',
+    'dashboard.chart.decisions':'Decisiones',
+    'dashboard.chart.conflicts':'Conflictos',
 
     'chat.label':        'RAG local',
     'chat.title':        'Asistente sobre tus audios',
@@ -162,6 +165,12 @@ const TRANSLATIONS = {
     'auth.new_password_prompt': 'Escribe tu nueva contraseña (mín. 6 caracteres):',
     'auth.reset_ok':            'Contraseña restablecida. Ya puedes iniciar sesión.',
     'auth.reset_error':         'Error al restablecer. El enlace puede haber expirado.',
+
+    'audio.rename':             'Renombrar',
+    'audio.rename.prompt':      'Nuevo nombre para el audio:',
+    'audio.confirm.delete':     '¿Eliminar este audio y su análisis?',
+    'audio.delete':             'Eliminar',
+    'chat.sources':             'Fuentes',
   },
 
   en: {
@@ -280,6 +289,9 @@ const TRANSLATIONS = {
     'dashboard.kpi.tasks':     'Tasks extracted',
     'dashboard.chart.sentiment':'Sentiment distribution',
     'dashboard.chart.totals':   'Totals extracted',
+    'dashboard.chart.tasks':    'Tasks',
+    'dashboard.chart.decisions':'Decisions',
+    'dashboard.chart.conflicts':'Conflicts',
 
     'chat.label':        'Local RAG',
     'chat.title':        'Assistant over your audios',
@@ -323,6 +335,12 @@ const TRANSLATIONS = {
     'auth.new_password_prompt': 'Enter your new password (min. 6 characters):',
     'auth.reset_ok':            'Password reset successfully. You can now sign in.',
     'auth.reset_error':         'Error resetting. The link may have expired.',
+
+    'audio.rename':             'Rename',
+    'audio.rename.prompt':      'New name for the audio:',
+    'audio.confirm.delete':     'Delete this audio and its analysis?',
+    'audio.delete':             'Delete',
+    'chat.sources':             'Sources',
   }
 };
 

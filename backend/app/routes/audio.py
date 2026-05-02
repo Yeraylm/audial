@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.etl.pipeline import process_single_audio
-from app.models import Audio, Job, JobStatus, get_db
+from pydantic import BaseModel
+
+from app.models import Audio, Job, JobStatus, Transcript, get_db
 from app.models.database import User
 from app.models.schemas import AudioOut, JobOut
 from app.services.auth_service import get_current_user
@@ -21,6 +23,10 @@ from app.services.auth_service import get_current_user
 router = APIRouter(prefix="/api/audio", tags=["audio"])
 
 ALLOWED_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
+
+
+class RenameIn(BaseModel):
+    filename: str
 
 
 def _session_id(request: Request) -> str:
@@ -109,11 +115,28 @@ def list_audios(
                     db.query(Job).filter(Job.audio_id == a.id)
                     .order_by(Job.id.desc()).first()
                 )
+                dur = float(a.duration_sec or 0.0)
+                # Backfill duration from transcript segments if not stored
+                if dur == 0:
+                    try:
+                        tr = db.query(Transcript).filter(Transcript.audio_id == a.id).first()
+                        if tr and isinstance(tr.segments_json, dict):
+                            segs = tr.segments_json.get("segments", [])
+                            if segs:
+                                dur = max(
+                                    (float(s.get("end", 0)) for s in segs if isinstance(s, dict)),
+                                    default=0.0,
+                                )
+                                if dur > 0:
+                                    a.duration_sec = dur
+                                    db.commit()
+                    except Exception:
+                        pass
                 result.append({
                     "id":          str(a.id),
                     "filename":    str(a.filename or ""),
                     "size_bytes":  int(a.size_bytes or 0),
-                    "duration_sec":float(a.duration_sec or 0.0),
+                    "duration_sec": dur,
                     "mime_type":   str(a.mime_type or "audio/mpeg"),
                     "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
                     "expires_at":  a.expires_at.isoformat() if a.expires_at else None,
@@ -176,3 +199,16 @@ def delete_audio(audio_id: str, request: Request, db: Session = Depends(get_db))
         pass
     db.delete(a); db.commit()
     return {"deleted": audio_id}
+
+
+@router.patch("/{audio_id}/rename")
+def rename_audio(audio_id: str, body: RenameIn, db: Session = Depends(get_db)):
+    a = db.query(Audio).filter(Audio.id == audio_id).first()
+    if not a:
+        raise HTTPException(404, "Audio no encontrado")
+    name = body.filename.strip()
+    if not name:
+        raise HTTPException(400, "Nombre requerido")
+    a.filename = name
+    db.commit()
+    return {"id": audio_id, "filename": name}

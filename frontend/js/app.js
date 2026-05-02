@@ -465,8 +465,11 @@ async function refreshAudios() {
           </div>
           ${getBadge(a.job_status)}
           ${guestBadge}
-          <button class="btn btn-link text-muted p-1 ms-2" onclick="event.stopPropagation();removeAudio('${a.id}')" title="Eliminar">
-            <i data-lucide="trash-2" style="width:16px;height:16px"></i>
+          <button class="btn btn-link text-muted p-1 ms-1" onclick="event.stopPropagation();renameAudio('${a.id}','${esc(a.filename)}')" title="${t('audio.rename')}">
+            <i data-lucide="pencil" style="width:15px;height:15px"></i>
+          </button>
+          <button class="btn btn-link text-muted p-1 ms-1" onclick="event.stopPropagation();removeAudio('${a.id}')" title="${t('audio.delete')}">
+            <i data-lucide="trash-2" style="width:15px;height:15px"></i>
           </button>
         </div>`;
     }).join('');
@@ -487,10 +490,34 @@ function getBadge(status) {
 }
 
 window.removeAudio = async function(id) {
-  if (!confirm('¿Eliminar este audio y su análisis?')) return;
+  if (!confirm(t('audio.confirm.delete'))) return;
   await fetch(`${API}/api/audio/${id}`, { method:'DELETE' });
   refreshAudios();
   if (id === currentAudioId) showPage('conversations');
+};
+
+window.renameAudio = async function(id, currentName) {
+  const newName = prompt(t('audio.rename.prompt'), currentName);
+  if (!newName || newName.trim() === currentName || !newName.trim()) return;
+  try {
+    const r = await fetch(`${API}/api/audio/${id}/rename`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: newName.trim() }),
+    });
+    if (!r.ok) return;
+    refreshAudios();
+    // Update player name if this audio is open in detail
+    if (currentAudioId === id) {
+      const pName = $('#audioPlayerName');
+      if (pName) pName.textContent = newName.trim();
+      const titleEl = $('#detailTitle');
+      // Only update title if it was showing the filename (short ID), not the summary
+      if (titleEl && (titleEl.textContent === currentName || titleEl.textContent.startsWith(id.slice(0,8)))) {
+        titleEl.textContent = newName.trim();
+      }
+    }
+  } catch (e) { console.warn('[Audial] renameAudio:', e); }
 };
 
 /* ============================================================
@@ -558,7 +585,22 @@ window.openAudio = async function(id) {
   // Actualizar nombre en el reproductor
   const audioInfo = await fetch(`${API}/api/audio/${id}`).then(r => r.ok ? r.json() : null).catch(() => null);
   const pName = $('#audioPlayerName');
-  if (pName && audioInfo?.filename) pName.textContent = audioInfo.filename;
+  if (pName && audioInfo?.filename) {
+    pName.textContent = audioInfo.filename;
+    // Add rename button next to filename if not already there
+    let rBtn = document.getElementById('playerRenameBtn');
+    if (!rBtn) {
+      rBtn = document.createElement('button');
+      rBtn.id = 'playerRenameBtn';
+      rBtn.className = 'btn btn-link text-muted p-0 ms-2';
+      rBtn.title = t('audio.rename');
+      rBtn.style.cssText = 'vertical-align:middle;line-height:1';
+      rBtn.innerHTML = '<i data-lucide="pencil" style="width:13px;height:13px"></i>';
+      pName.parentElement?.insertBefore(rBtn, pName.nextSibling);
+    }
+    rBtn.onclick = () => renameAudio(id, pName.textContent);
+    refreshIcons();
+  }
 
   window._lastAnalysis = a; // cache for lang re-render
 
@@ -660,6 +702,25 @@ function renderSentiment(s, conflicts) {
   destroyChart('sentEvo'); destroyChart('sentSpk');
   const evo = s?.evolution || [], per = s?.per_speaker || [];
   const base = baseOpts();
+
+  // Global sentiment badge (always shown when available)
+  const globalBadgeId = 'sentimentGlobalBadge';
+  let existingBadge = document.getElementById(globalBadgeId);
+  if (existingBadge) existingBadge.remove();
+  if (s?.global?.label) {
+    const sentPanel = $('.tab-panel[data-tab="sentiment"]');
+    if (sentPanel) {
+      const badge = document.createElement('div');
+      badge.id = globalBadgeId;
+      badge.style.cssText = 'margin-bottom:16px';
+      const lbl = s.global.label;
+      const score = s.global.score != null ? Math.round(Math.abs(s.global.score) * 100) : null;
+      const color = lbl === 'positive' || lbl === 'positivo' ? '#39FF14' :
+                    lbl === 'negative' || lbl === 'negativo' ? '#FF5252' : '#8DA88D';
+      badge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:rgba(255,255,255,.06);font-size:13px;color:${color};font-weight:600;text-transform:capitalize">${lbl}${score != null ? ` &nbsp;·&nbsp; ${score}%` : ''}</span>`;
+      sentPanel.insertBefore(badge, sentPanel.firstChild);
+    }
+  }
 
   const evoEl = $('#sentimentEvolutionChart');
   if (evoEl) charts.sentEvo = new Chart(evoEl, {
@@ -835,7 +896,7 @@ async function refreshDashboard() {
     const ttEl = $('#totalsChart');
     if (ttEl) charts.tt = new Chart(ttEl, {
       type:'bar',
-      data:{ labels:['Tareas','Decisiones','Conflictos'], datasets:[{
+      data:{ labels:[t('dashboard.chart.tasks'), t('dashboard.chart.decisions'), t('dashboard.chart.conflicts')], datasets:[{
         data:[tot.tasks??0, tot.decisions??0, tot.conflicts??0],
         backgroundColor:['#39FF14','#00C853','#00E5CC'], borderRadius:8, borderWidth:0 }]},
       options:{ ...baseOpts(), plugins:{ legend:{display:false} } }
@@ -895,7 +956,7 @@ function appendMsg(role, text, sources = []) {
   if (sources?.length) {
     const s = document.createElement('div');
     s.className = 'msg-sources';
-    s.textContent = 'Fuentes: ' + sources.slice(0,5).map(x => `seg ${x.segment_idx} (${x.score})`).join(' · ');
+    s.textContent = t('chat.sources') + ': ' + sources.slice(0,5).map(x => `seg ${x.segment_idx} (${x.score})`).join(' · ');
     div.appendChild(s);
   }
   log.appendChild(div);

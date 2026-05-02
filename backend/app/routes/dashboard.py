@@ -4,12 +4,13 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from loguru import logger
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models import Analysis, Audio, get_db
+from app.models.database import User
+from app.services.auth_service import get_current_user
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -29,16 +30,30 @@ def _safe_items(val: Any) -> list:
 
 
 @router.get("/overview")
-def overview(db: Session = Depends(get_db)):
-    # Total audios — consulta básica, no puede fallar si la tabla existe
+def overview(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
+):
+    session_id = request.headers.get("X-Session-ID", "") or ""
     try:
-        total_audios = db.query(Audio).count()
+        q = db.query(Audio)
+        if current_user:
+            q = q.filter(Audio.user_id == current_user.id)
+        elif session_id:
+            q = q.filter(Audio.session_id == session_id)
+        user_audios = q.all()
+        total_audios = len(user_audios)
+        audio_ids = [a.id for a in user_audios]
     except Exception as e:
         logger.warning(f"Dashboard: tabla audios no disponible: {e}")
         return _EMPTY
 
     try:
-        total_analyses = db.query(Analysis).count()
+        total_analyses = (
+            db.query(Analysis).filter(Analysis.audio_id.in_(audio_ids)).count()
+            if audio_ids else 0
+        )
     except Exception as e:
         logger.warning(f"Dashboard: tabla analyses no disponible: {e}")
         return {**_EMPTY, "total_audios": total_audios}
@@ -48,16 +63,20 @@ def overview(db: Session = Depends(get_db)):
     tasks = decisions = conflicts = 0
 
     try:
-        for a in db.query(Analysis).all():
+        analyses = (
+            db.query(Analysis).filter(Analysis.audio_id.in_(audio_ids)).all()
+            if audio_ids else []
+        )
+        for a in analyses:
             try:
                 total_duration += float((a.metrics or {}).get("total_duration_sec") or 0)
-                lbl = str((a.sentiment or {}).get("global", {}).get("label") or "neutro")
+                lbl = str((a.sentiment or {}).get("global", {}).get("label") or "neutral")
                 sentiments[lbl] += 1
                 tasks     += len(_safe_items(a.tasks))
                 decisions += len(_safe_items(a.decisions))
                 conflicts += len(_safe_items(a.conflicts))
             except Exception:
-                pass  # Saltar análisis problemático
+                pass
     except Exception as e:
         logger.warning(f"Dashboard: error iterando analyses: {e}")
 
