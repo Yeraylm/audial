@@ -20,6 +20,7 @@ from app.services.prompts import (
     CONFLICT_DETECTION,
     DECISIONS_EXTRACTION,
     ENTITIES_EXTRACTION,
+    ENTITIES_EXTRACTION_EN,
     INTENTS_DETECTION,
     QUESTIONS_EXTRACTION,
     SEGMENTATION_TOPICS,
@@ -39,7 +40,7 @@ def _fmt_time(t: float) -> str:
 
 def _number_segments(segments: list[dict]) -> str:
     return "\n".join(
-        f"{i}|{_fmt_time(s.get('start', 0))}|{s.get('speaker', 'SPK')}|{s.get('text', '').strip()}"
+        f"{i}|{_fmt_time(s.get('start', 0))}|{s.get('speaker') or 'SPEAKER_00'}|{s.get('text', '').strip()}"
         for i, s in enumerate(segments)
     )
 
@@ -103,7 +104,8 @@ def hierarchical_summary(text: str, lang: str = "es") -> dict[str, str]:
 
 
 def extract_entities(text: str, lang: str = "es") -> dict[str, Any]:
-    data = llm.complete_json(ENTITIES_EXTRACTION.format(text=text[:8000]), system=get_system_prompt(lang))
+    prompt = ENTITIES_EXTRACTION_EN if lang.startswith("en") else ENTITIES_EXTRACTION
+    data = llm.complete_json(prompt.format(text=text[:8000]), system=get_system_prompt(lang))
     return data if isinstance(data, dict) else {}
 
 
@@ -121,7 +123,22 @@ def segment_topics(segments: list[dict], lang: str = "es") -> list[dict[str, Any
 def build_timeline(segments: list[dict], lang: str = "es") -> list[dict[str, Any]]:
     data = llm.complete_json(TIMELINE_EVENTS.format(numbered=_number_segments(segments)[:8000]),
                              system=get_system_prompt(lang))
-    return data if isinstance(data, list) else []
+    if isinstance(data, list) and data:
+        return data
+    # Fallback: surface first, middle, and last segments as timeline anchors
+    if not segments:
+        return []
+    idxs = sorted(set([0, len(segments) // 2, len(segments) - 1]))
+    return [
+        {
+            "time": _fmt_time(segments[i].get("start", 0)),
+            "event": (segments[i].get("text") or "").strip()[:120],
+            "speaker": segments[i].get("speaker") or "SPEAKER_00",
+            "importance": 3 if i == len(segments) // 2 else 2,
+        }
+        for i in idxs
+        if (segments[i].get("text") or "").strip()
+    ]
 
 
 def extract_tasks(text: str, lang: str = "es") -> list[dict[str, Any]]:
@@ -142,7 +159,28 @@ def extract_questions(text: str, lang: str = "es") -> list[dict[str, Any]]:
 def analyze_sentiment(segments: list[dict], lang: str = "es") -> dict[str, Any]:
     data = llm.complete_json(SENTIMENT_ANALYSIS.format(numbered=_number_segments(segments)[:8000]),
                              system=get_system_prompt(lang))
-    return data if isinstance(data, dict) else {"global": {"label": "neutral" if lang.startswith("en") else "neutro", "score": 0.0}}
+    if not isinstance(data, dict):
+        data = {}
+
+    default_label = "neutral" if lang.startswith("en") else "neutro"
+    if "global" not in data or not isinstance(data.get("global"), dict):
+        data["global"] = {"label": default_label, "score": 0.0}
+
+    global_score = float(data["global"].get("score") or 0.0)
+
+    # Fallback: generate evolution from each segment if LLM didn't provide it
+    if not data.get("evolution") and segments:
+        data["evolution"] = [
+            {"segment": i, "score": global_score}
+            for i in range(len(segments))
+        ]
+
+    # Fallback: generate per_speaker if LLM didn't provide it
+    if not data.get("per_speaker") and segments:
+        speakers = list(dict.fromkeys(s.get("speaker") or "SPEAKER_00" for s in segments))
+        data["per_speaker"] = [{"speaker": spk, "score": global_score} for spk in speakers]
+
+    return data
 
 
 def detect_conflicts(text: str, lang: str = "es") -> list[dict[str, Any]]:

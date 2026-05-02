@@ -63,6 +63,23 @@ TRANSCRIPCION:
 ---
 """
 
+ENTITIES_EXTRACTION_EN = """Extract entities from the following transcript. Return ONLY this JSON:
+
+{{
+  "persons":   [{{"name": "...", "role": "..."}}],
+  "companies": ["..."],
+  "places":    ["..."],
+  "dates":     ["..."],
+  "products":  ["..."],
+  "tasks":     ["..."]
+}}
+
+TRANSCRIPT:
+---
+{text}
+---
+"""
+
 INTENTS_DETECTION = """Clasifica las intenciones principales. Devuelve un array JSON con objetos:
 {{ "intent": "peticion|acuerdo|queja|propuesta|pregunta|informacion|otro",
    "evidence": "cita breve",
@@ -121,14 +138,14 @@ TRANSCRIPCION:
 ---
 """
 
-SENTIMENT_ANALYSIS = """Evalua sentimiento global y por hablante. JSON:
+SENTIMENT_ANALYSIS = """Analyze the sentiment of each speaker and the overall conversation. Return ONLY this JSON (no extra text):
 {{
-  "global":   {{ "label": "positivo|neutro|negativo", "score": -1.0 a 1.0 }},
-  "per_speaker": [ {{ "speaker": "...", "label": "...", "score": float }} ],
-  "evolution": [ {{ "segment": int, "label": "...", "score": float }} ]
+  "global":      {{ "label": "positive|neutral|negative", "score": -1.0_to_1.0 }},
+  "per_speaker": [ {{ "speaker": "SPEAKER_XX", "label": "positive|neutral|negative", "score": float }} ],
+  "evolution":   [ {{ "segment": 0, "label": "positive|neutral|negative", "score": float }}, ... one entry per segment ]
 }}
 
-SEGMENTOS (idx|speaker|text):
+SEGMENTS (idx|time|speaker|text):
 ---
 {numbered}
 ---

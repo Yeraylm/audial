@@ -81,6 +81,7 @@ const TRANSLATIONS = {
     'summary.long':       'Resumen completo',
     'transcript.search':  'Buscar en la transcripción…',
     'transcript.count':   'segmentos',
+    'transcript.speaker': 'Hablante',
 
     'tasks.title':      'Tareas',
     'decisions.title':  'Decisiones',
@@ -170,7 +171,15 @@ const TRANSLATIONS = {
     'audio.rename.prompt':      'Nuevo nombre para el audio:',
     'audio.confirm.delete':     '¿Eliminar este audio y su análisis?',
     'audio.delete':             'Eliminar',
+    'audio.file.unavail':       'Archivo de audio no disponible (el servidor fue reiniciado). El análisis sigue accesible.',
     'chat.sources':             'Fuentes',
+
+    'entities.personas':  'Personas',
+    'entities.empresas':  'Empresas',
+    'entities.lugares':   'Lugares',
+    'entities.fechas':    'Fechas',
+    'entities.productos': 'Productos',
+    'entities.tareas':    'Tareas',
   },
 
   en: {
@@ -251,6 +260,7 @@ const TRANSLATIONS = {
     'summary.long':       'Full summary',
     'transcript.search':  'Search in the transcript…',
     'transcript.count':   'segments',
+    'transcript.speaker': 'Speaker',
 
     'tasks.title':      'Tasks',
     'decisions.title':  'Decisions',
@@ -340,7 +350,15 @@ const TRANSLATIONS = {
     'audio.rename.prompt':      'New name for the audio:',
     'audio.confirm.delete':     'Delete this audio and its analysis?',
     'audio.delete':             'Delete',
+    'audio.file.unavail':       'Audio file not available (server was restarted). Analysis is still accessible.',
     'chat.sources':             'Sources',
+
+    'entities.personas':  'Persons',
+    'entities.empresas':  'Companies',
+    'entities.lugares':   'Places',
+    'entities.fechas':    'Dates',
+    'entities.productos': 'Products',
+    'entities.tareas':    'Tasks',
   }
 };
 

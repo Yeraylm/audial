@@ -79,6 +79,24 @@ function fmtDate(iso) {
 function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+function fmtSpeaker(spk) {
+  if (!spk) return t('transcript.speaker') + ' 1';
+  const m = spk.match(/(\d+)$/);
+  if (m) return t('transcript.speaker') + ' ' + (parseInt(m[1]) + 1);
+  return spk;
+}
+// Map LLM entity keys (Spanish or English) → display label in current UI language
+function fmtEntityKey(k) {
+  const map = {
+    'personas': t('entities.personas'), 'people': t('entities.personas'), 'persons': t('entities.personas'),
+    'empresas': t('entities.empresas'), 'companies': t('entities.empresas'), 'organizations': t('entities.empresas'),
+    'lugares':  t('entities.lugares'),  'places':  t('entities.lugares'),  'locations': t('entities.lugares'),
+    'fechas':   t('entities.fechas'),   'dates':   t('entities.fechas'),
+    'productos':t('entities.productos'),'products':t('entities.productos'),
+    'tareas':   t('entities.tareas'),   'tasks':   t('entities.tareas'),
+  };
+  return map[k.toLowerCase()] || k.charAt(0).toUpperCase() + k.slice(1);
+}
 function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 function refreshIcons() { if (window.lucide) lucide.createIcons(); }
 
@@ -554,6 +572,14 @@ window.openAudio = async function(id) {
     player.load();
     if (playerName) playerName.textContent = id.slice(0,8) + '…';
     playerBar.style.display = 'flex';
+    // Handle missing file (HF Spaces ephemeral storage wipe on restart)
+    player.onerror = () => {
+      const warn = document.createElement('div');
+      warn.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;color:var(--tx-3);font-size:13px';
+      warn.innerHTML = `<i data-lucide="file-x" style="width:15px;height:15px;flex-shrink:0"></i>${t('audio.file.unavail')}`;
+      player.replaceWith(warn);
+      refreshIcons();
+    };
   }
 
   // Pasar idioma UI para obtener el análisis ya en el idioma correcto
@@ -646,7 +672,7 @@ function renderTranscript(tr) {
     list.innerHTML = f.map(s => `
       <div class="segment-row">
         <span class="seg-time">${fmtDur(s.start)}</span>
-        <span class="seg-speaker">${esc(s.speaker || 'SPK_00')}</span>
+        <span class="seg-speaker">${esc(fmtSpeaker(s.speaker))}</span>
         <span class="seg-text">${esc(s.text)}</span>
       </div>`).join('');
   };
@@ -663,7 +689,7 @@ function renderEntities(ent) {
   block.innerHTML = cats.map(k => {
     const items = ent[k] || [];
     const chips = items.map(i => `<span class="entity-chip">${esc(typeof i === 'string' ? i : (i.name||JSON.stringify(i)))}</span>`).join('');
-    return `<div class="col-md-4"><div class="entity-group"><div class="entity-group-title">${esc(k)}</div><div>${chips || '<span class="text-muted small">–</span>'}</div></div></div>`;
+    return `<div class="col-md-4"><div class="entity-group"><div class="entity-group-title">${esc(fmtEntityKey(k))}</div><div>${chips || '<span class="text-muted small">–</span>'}</div></div></div>`;
   }).join('');
 }
 
