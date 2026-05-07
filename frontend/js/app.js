@@ -1628,8 +1628,8 @@ document.addEventListener('DOMContentLoaded', () => {
     _backdrop.id = 'navBackdrop';
     _backdrop.style.cssText = [
       'display:none', 'position:fixed', 'inset:0',
-      'background:rgba(0,0,0,.65)', 'backdrop-filter:blur(4px)',
-      'z-index:1029', 'transition:opacity .25s',
+      'background:rgba(0,0,0,.55)',
+      'z-index:1019',  /* sticky-top = 1020, backdrop queda debajo del navbar */
     ].join(';');
     document.body.appendChild(_backdrop);
 
