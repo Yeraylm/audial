@@ -135,7 +135,7 @@ const TRANSLATIONS = {
     'chat.placeholder':  'Escribe tu pregunta…',
     'chat.all':          'Todas las conversaciones',
 
-    'footer':            'Audial · Plataforma IA Conversacional · Whisper + Groq + RAG · TFM 2026',
+    'footer':            'Audial · Yeray Luque Moreno · Máster IA y Big Data · TFM 2026',
 
     'auth.login':         'Iniciar sesión',
     'auth.register':      'Crear cuenta',
@@ -319,7 +319,7 @@ const TRANSLATIONS = {
     'chat.placeholder':  'Type your question…',
     'chat.all':          'All conversations',
 
-    'footer':            'Audial · Conversational AI Platform · Whisper + Groq + RAG · TFM 2026',
+    'footer':            'Audial · Yeray Luque Moreno · Master in AI and Big Data · TFM 2026',
 
     'auth.login':         'Sign in',
     'auth.register':      'Create account',
