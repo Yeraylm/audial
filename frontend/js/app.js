@@ -326,9 +326,18 @@ window.showPage = function(name) {
   refreshIcons();
 };
 
+function _closeNavbar() {
+  const nc = document.getElementById('navMain');
+  if (nc && window.bootstrap) bootstrap.Collapse.getInstance(nc)?.hide();
+}
+
 $$('.nav-pill').forEach(a => {
   if (a.dataset.page) {
-    a.addEventListener('click', e => { e.preventDefault(); showPage(a.dataset.page); });
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      showPage(a.dataset.page);
+      _closeNavbar(); // cerrar menú móvil al navegar
+    });
   }
 });
 
@@ -1611,6 +1620,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Logout
   document.getElementById('logoutBtn')?.addEventListener('click', _doLogout);
+
+  // Mobile navbar: backdrop + scroll lock + close on item click
+  const _navCollapse = document.getElementById('navMain');
+  if (_navCollapse) {
+    const _backdrop = document.createElement('div');
+    _backdrop.id = 'navBackdrop';
+    _backdrop.style.cssText = [
+      'display:none', 'position:fixed', 'inset:0',
+      'background:rgba(0,0,0,.65)', 'backdrop-filter:blur(4px)',
+      'z-index:1029', 'transition:opacity .25s',
+    ].join(';');
+    document.body.appendChild(_backdrop);
+
+    _backdrop.addEventListener('click', _closeNavbar);
+
+    _navCollapse.addEventListener('show.bs.collapse', () => {
+      _backdrop.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    });
+    _navCollapse.addEventListener('hide.bs.collapse', () => {
+      _backdrop.style.display = 'none';
+      document.body.style.overflow = '';
+    });
+  }
 
   // Rename modal
   document.getElementById('renameSubmitBtn')?.addEventListener('click', _submitRename);
