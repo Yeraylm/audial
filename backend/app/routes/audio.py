@@ -7,7 +7,7 @@ from pathlib import Path
 import datetime as dt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse as FastFileResponse
+from fastapi.responses import FileResponse as FastFileResponse, RedirectResponse
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,7 @@ from app.models import Audio, Job, JobStatus, Transcript, get_db
 from app.models.database import User
 from app.models.schemas import AudioOut, JobOut
 from app.services.auth_service import get_current_user
+from app.services import storage as cloud_storage
 
 router = APIRouter(prefix="/api/audio", tags=["audio"])
 
@@ -78,6 +79,11 @@ async def upload_audio(
         shutil.copyfileobj(file.file, out)
     audio.filepath = str(dest)
     audio.size_bytes = dest.stat().st_size
+
+    # Subir a Supabase Storage para persistencia tras reinicios de HF Spaces
+    storage_url = cloud_storage.upload(dest, f"{audio.id}{ext}", audio.mime_type)
+    if storage_url:
+        audio.storage_url = storage_url
     db.commit()
 
     job = Job(audio_id=audio.id, status=JobStatus.PENDING, stage="queued", message="En cola")
@@ -177,15 +183,18 @@ def job_status(job_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{audio_id}/file")
 def stream_audio(audio_id: str, db: Session = Depends(get_db)):
-    """Sirve el archivo de audio original para el reproductor del frontend."""
+    """Sirve el archivo de audio. Intenta disco local primero, luego Supabase Storage."""
     a = db.query(Audio).filter(Audio.id == audio_id).first()
     if not a:
         raise HTTPException(404, "Audio no encontrado")
-    p = Path(a.filepath)
-    if not p.exists():
-        raise HTTPException(404, "Archivo de audio no encontrado en disco")
-    media_type = a.mime_type or "audio/mpeg"
-    return FastFileResponse(str(p), media_type=media_type, headers={"Accept-Ranges": "bytes"})
+    p = Path(a.filepath) if a.filepath else None
+    if p and p.exists():
+        media_type = a.mime_type or "audio/mpeg"
+        return FastFileResponse(str(p), media_type=media_type, headers={"Accept-Ranges": "bytes"})
+    # Fallback: redirigir a Supabase Storage si el archivo local fue borrado
+    if getattr(a, "storage_url", None):
+        return RedirectResponse(url=a.storage_url, status_code=302)
+    raise HTTPException(404, "Archivo de audio no disponible")
 
 
 @router.delete("/{audio_id}")
@@ -197,6 +206,10 @@ def delete_audio(audio_id: str, request: Request, db: Session = Depends(get_db))
         Path(a.filepath).unlink(missing_ok=True)
     except Exception:
         pass
+    # Eliminar también de Supabase Storage
+    if getattr(a, "storage_url", None):
+        ext = Path(a.filepath).suffix if a.filepath else ""
+        cloud_storage.delete(f"{audio_id}{ext}")
     db.delete(a); db.commit()
     return {"deleted": audio_id}
 

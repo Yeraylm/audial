@@ -63,6 +63,14 @@ class Settings(BaseSettings):
     )
     vector_backend: str = os.getenv("VECTOR_BACKEND", "chroma")  # chroma|faiss
 
+    # --- Supabase Storage (opcional) ---
+    # Permite persistir los archivos de audio en la nube para
+    # que sobrevivan a reinicios del contenedor HF Spaces.
+    # SUPABASE_URL  = https://<ref>.supabase.co
+    # SUPABASE_SERVICE_KEY = service_role key (Settings › API)
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_service_key: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+
     # --- Limits ---
     max_audio_mb: int = 200
     chunk_seconds: int = 30

@@ -514,29 +514,58 @@ window.removeAudio = async function(id) {
   if (id === currentAudioId) showPage('conversations');
 };
 
-window.renameAudio = async function(id, currentName) {
-  const newName = prompt(t('audio.rename.prompt'), currentName);
-  if (!newName || newName.trim() === currentName || !newName.trim()) return;
+// ── Rename Modal ──────────────────────────────────────────────────────
+let _renameBsModal = null;
+let _renameTargetId = null;
+let _renameOldName  = null;
+
+window.renameAudio = function(id, currentName) {
+  _renameTargetId = id;
+  _renameOldName  = currentName;
+  const input = document.getElementById('renameInput');
+  const errEl = document.getElementById('renameError');
+  if (input) { input.value = currentName; }
+  if (errEl) errEl.classList.add('hidden');
+  if (!_renameBsModal && window.bootstrap) {
+    const el = document.getElementById('renameModal');
+    if (el) _renameBsModal = new bootstrap.Modal(el);
+  }
+  _renameBsModal?.show();
+  setTimeout(() => { const inp = document.getElementById('renameInput'); inp?.focus(); inp?.select(); }, 350);
+};
+
+async function _submitRename() {
+  const newName = document.getElementById('renameInput')?.value?.trim();
+  const errEl   = document.getElementById('renameError');
+  if (!newName) {
+    if (errEl) { errEl.textContent = t('audio.rename.required'); errEl.classList.remove('hidden'); }
+    return;
+  }
+  const btn = document.getElementById('renameSubmitBtn');
+  if (btn) btn.disabled = true;
   try {
-    const r = await fetch(`${API}/api/audio/${id}/rename`, {
+    const r = await fetch(`${API}/api/audio/${_renameTargetId}/rename`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filename: newName.trim() }),
+      body: JSON.stringify({ filename: newName }),
     });
-    if (!r.ok) return;
-    refreshAudios();
-    // Update player name if this audio is open in detail
-    if (currentAudioId === id) {
-      const pName = $('#audioPlayerName');
-      if (pName) pName.textContent = newName.trim();
-      const titleEl = $('#detailTitle');
-      // Only update title if it was showing the filename (short ID), not the summary
-      if (titleEl && (titleEl.textContent === currentName || titleEl.textContent.startsWith(id.slice(0,8)))) {
-        titleEl.textContent = newName.trim();
-      }
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      if (errEl) { errEl.textContent = d.detail || 'Error'; errEl.classList.remove('hidden'); }
+      return;
     }
-  } catch (e) { console.warn('[Audial] renameAudio:', e); }
-};
+    _renameBsModal?.hide();
+    refreshAudios();
+    if (currentAudioId === _renameTargetId) {
+      const pName = $('#audioPlayerName');
+      if (pName) pName.textContent = newName;
+    }
+  } catch (e) {
+    if (errEl) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
 
 /* ============================================================
    DETAIL VIEW
@@ -1566,6 +1595,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Logout
   document.getElementById('logoutBtn')?.addEventListener('click', _doLogout);
+
+  // Rename modal
+  document.getElementById('renameSubmitBtn')?.addEventListener('click', _submitRename);
+  document.getElementById('renameInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') _submitRename(); });
 
   // Lang switch buttons
   document.querySelector('[data-lang-btn="es"]')?.addEventListener('click', () => i18n.setLang('es'));

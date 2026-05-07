@@ -96,6 +96,8 @@ class Audio(Base):
     user_id:     Mapped[str|None]     = mapped_column(String(64), nullable=True)
     # Invitados: audio temporal con fecha de expiración (24 h). NULL = permanente.
     expires_at:  Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)
+    # URL de Supabase Storage (persiste aunque el servidor se reinicie)
+    storage_url: Mapped[str|None]        = mapped_column(String(1024), nullable=True)
 
     jobs       = relationship("Job",        back_populates="audio", cascade="all, delete")
     transcript = relationship("Transcript", back_populates="audio", uselist=False, cascade="all, delete")
@@ -200,8 +202,9 @@ def init_db() -> None:
         _add_column_if_missing(conn, "audios", "session_id",  "VARCHAR(64) DEFAULT ''")
         _add_column_if_missing(conn, "audios", "ui_language", "VARCHAR(8)  DEFAULT 'es'")
         _add_column_if_missing(conn, "audios", "user_id",     "VARCHAR(64)")
-        _add_column_if_missing(conn, "audios", "expires_at",  "DATETIME")
-        _add_column_if_missing(conn, "users",  "role_id",     "INTEGER DEFAULT 3")
+        _add_column_if_missing(conn, "audios", "expires_at",   "DATETIME")
+        _add_column_if_missing(conn, "audios", "storage_url",  "VARCHAR(1024)")
+        _add_column_if_missing(conn, "users",  "role_id",      "INTEGER DEFAULT 3")
 
     # Seed de roles (idempotente)
     _seed_roles()
