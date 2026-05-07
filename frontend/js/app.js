@@ -664,6 +664,10 @@ window.openAudio = async function(id) {
   const pName = $('#audioPlayerName');
   if (pName && audioInfo?.filename) {
     pName.textContent = audioInfo.filename;
+    // Breadcrumb muestra el nombre del audio, no el resumen del análisis
+    if (titleEl) titleEl.textContent = audioInfo.filename.length > 45
+      ? audioInfo.filename.slice(0, 45) + '…'
+      : audioInfo.filename;
     // Add rename button next to filename if not already there
     let rBtn = document.getElementById('playerRenameBtn');
     if (!rBtn) {
