@@ -501,14 +501,16 @@ async function refreshAudios() {
             <div class="name">${esc(a.filename)}</div>
             <div class="sub">${fmtDur(a.duration_sec)} · ${fmtDate(a.uploaded_at)}</div>
           </div>
-          ${getBadge(a.job_status)}
-          ${guestBadge}
-          <button class="btn btn-link text-muted p-1 ms-1" onclick="event.stopPropagation();renameAudio('${a.id}','${esc(a.filename)}')" title="${t('audio.rename')}">
-            <i data-lucide="pencil" style="width:15px;height:15px"></i>
-          </button>
-          <button class="btn btn-link text-muted p-1 ms-1" onclick="event.stopPropagation();removeAudio('${a.id}')" title="${t('audio.delete')}">
-            <i data-lucide="trash-2" style="width:15px;height:15px"></i>
-          </button>
+          <div class="audio-actions">
+            ${getBadge(a.job_status)}
+            ${guestBadge}
+            <button class="btn btn-link text-muted p-1" onclick="event.stopPropagation();renameAudio('${a.id}','${esc(a.filename)}')" title="${t('audio.rename')}">
+              <i data-lucide="pencil" style="width:15px;height:15px"></i>
+            </button>
+            <button class="btn btn-link text-muted p-1" onclick="event.stopPropagation();removeAudio('${a.id}')" title="${t('audio.delete')}">
+              <i data-lucide="trash-2" style="width:15px;height:15px"></i>
+            </button>
+          </div>
         </div>`;
     }).join('');
     refreshIcons();

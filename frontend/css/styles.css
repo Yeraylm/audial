@@ -524,7 +524,28 @@ body.cursor-click .cursor-ring { width: 28px; height: 28px; }
 .audio-avatar svg { width:22px;height:22px; }
 .audio-meta { flex:1; min-width:0; }
 .audio-meta .name { font-weight:600; color:var(--tx-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:15px; }
-.audio-meta .sub  { font-size:12px; color:var(--tx-3); margin-top:3px; }
+.audio-meta .sub  { font-size:12px; color:var(--tx-3); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.audio-actions { display:flex; align-items:center; gap:2px; flex-shrink:0; }
+
+@media (max-width:600px) {
+  .audio-row {
+    flex-wrap:wrap;
+    padding:12px 14px;
+    gap:8px 12px;
+    align-items:flex-start;
+  }
+  .audio-row:hover { transform:none; }
+  .audio-avatar { width:40px; height:40px; border-radius:10px; align-self:center; }
+  .audio-avatar svg { width:18px; height:18px; }
+  .audio-meta { flex:1; min-width:0; align-self:center; }
+  .audio-meta .name { font-size:14px; }
+  .audio-actions {
+    flex-basis:100%;
+    padding-left:52px; /* alinear bajo el avatar */
+    gap:6px;
+    flex-wrap:nowrap;
+  }
+}
 
 .badge-pill { display:inline-flex;align-items:center;gap:5px;padding:3px 11px;font-size:11px;font-weight:600;border-radius:999px; }
 .badge-ok      { background:rgba(0,200,83,.15); color:var(--emerald-lt); }
