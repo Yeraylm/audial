@@ -108,13 +108,24 @@ function refreshIcons() { if (window.lucide) lucide.createIcons(); }
   const ring = $('#cursorRing');
   if (!dot || !ring) return;
 
+  // Ocultar hasta el primer mousemove para no aparecer en (0,0)
+  dot.style.opacity  = '0';
+  ring.style.opacity = '0';
+
   let rx = 0, ry = 0;
   let cx = 0, cy = 0;
+  let _moved = false;
 
   document.addEventListener('mousemove', e => {
     cx = e.clientX; cy = e.clientY;
-    dot.style.left  = cx + 'px';
-    dot.style.top   = cy + 'px';
+    dot.style.left = cx + 'px';
+    dot.style.top  = cy + 'px';
+    if (!_moved) {
+      _moved = true;
+      rx = cx; ry = cy; // snap del ring a la posición real
+      dot.style.opacity  = '';
+      ring.style.opacity = '';
+    }
   });
 
   // Ring follows with lag
