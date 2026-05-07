@@ -18,9 +18,8 @@ data/*.db
 data/*.sqlite
 !data/.gitkeep
 
-# Generated docs (too large for git)
-docs/*.docx
-docs/*.pdf
+# Documentación TFM (no pertenece al repositorio de código)
+docs/
 
 # IDE
 .vscode/
