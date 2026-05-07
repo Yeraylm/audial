@@ -20,9 +20,10 @@ _BUCKET = "audio-files"
 
 
 def _headers() -> dict[str, str]:
+    key = (settings.supabase_service_key or "").strip()
     return {
-        "Authorization": f"Bearer {settings.supabase_service_key}",
-        "apikey": settings.supabase_service_key,
+        "Authorization": f"Bearer {key}",
+        "apikey": key,
     }
 
 

@@ -611,11 +611,11 @@ window.openAudio = async function(id) {
     };
   }
 
-  // Pasar idioma UI para obtener el análisis ya en el idioma correcto
+  // Pasar idioma UI para obtener análisis Y transcript en el idioma correcto
   const uiLang = window.i18n?.lang || 'es';
   const [aRes, tRes] = await Promise.all([
     fetch(`${API}/api/analysis/${id}?lang=${uiLang}`),
-    fetch(`${API}/api/analysis/${id}/transcript`),
+    fetch(`${API}/api/analysis/${id}/transcript?lang=${uiLang}`),
   ]);
 
   if (!aRes.ok || !tRes.ok) {
@@ -1285,7 +1285,12 @@ async function translateAndRender(audioId, targetLang) {
     safe(() => renderTopics(a.topics, a.intents));
     safe(() => renderTimeline(a.timeline));
     safe(() => renderMetrics(a.metrics));
-    safe(() => loadRelated(audioId));  // recargar relacionados con etiquetas traducidas
+    safe(() => loadRelated(audioId));
+    // Re-renderizar transcript traducido
+    try {
+      const tRes = await fetch(`${API}/api/analysis/${audioId}/transcript?lang=${targetLang}`);
+      if (tRes.ok) { const tr = await tRes.json(); safe(() => renderTranscript(tr)); }
+    } catch {}
     refreshIcons();
   } finally {
     $('#translatingBadge')?.remove();
@@ -1627,6 +1632,6 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshDashboard();
   // Sincronizar rol desde servidor al arrancar (detecta usuarios eliminados o roles cambiados)
   refreshUserRole();
-  setInterval(refreshDashboard, 60000);  // cada minuto
+  setInterval(refreshDashboard, 300000); // cada 5 min
   setInterval(refreshUserRole, 180000);  // cada 3 min
 });

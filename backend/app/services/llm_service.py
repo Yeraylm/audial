@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from typing import Any, Iterator
 
 import httpx
@@ -40,14 +41,24 @@ class GroqLLM:
         messages.append({"role": "user", "content": prompt})
         payload = {"model": self.MODEL, "messages": messages,
                    "temperature": temperature, "max_tokens": max_tokens}
-        try:
-            r = httpx.post(f"{self.BASE}/chat/completions",
-                           json=payload, headers=self.headers, timeout=120)
-            r.raise_for_status()
-            return r.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            logger.error(f"Groq error: {e}")
-            return ""
+        for attempt in range(4):
+            try:
+                r = httpx.post(f"{self.BASE}/chat/completions",
+                               json=payload, headers=self.headers, timeout=120)
+                if r.status_code == 429:
+                    wait = 2 ** attempt * 3  # 3, 6, 12, 24 s
+                    logger.warning(f"Groq 429 rate limit — reintentando en {wait}s (intento {attempt+1}/4)")
+                    time.sleep(wait)
+                    continue
+                r.raise_for_status()
+                return r.json()["choices"][0]["message"]["content"].strip()
+            except httpx.HTTPStatusError:
+                raise
+            except Exception as e:
+                logger.error(f"Groq error: {e}")
+                return ""
+        logger.error("Groq: máximo de reintentos alcanzado (429)")
+        return ""
 
     def complete_json(self, prompt: str, system: str | None = None) -> Any:
         guard = ("Respond ONLY with valid JSON. No markdown, no commentary.")

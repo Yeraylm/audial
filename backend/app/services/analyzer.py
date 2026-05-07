@@ -117,7 +117,14 @@ def detect_intents(text: str, lang: str = "es") -> list[dict[str, Any]]:
 def segment_topics(segments: list[dict], lang: str = "es") -> list[dict[str, Any]]:
     data = llm.complete_json(SEGMENTATION_TOPICS.format(numbered=_number_segments(segments)[:8000]),
                              system=get_system_prompt(lang))
-    return data if isinstance(data, list) else []
+    if isinstance(data, list) and data:
+        return data
+    # Fallback: un tema general cubriendo todos los segmentos
+    if segments:
+        summary = " ".join(s.get("text", "") for s in segments[:4]).strip()[:200]
+        label = "General" if lang.startswith("en") else "General"
+        return [{"topic": label, "start_idx": 0, "end_idx": len(segments) - 1, "summary": summary}]
+    return []
 
 
 def build_timeline(segments: list[dict], lang: str = "es") -> list[dict[str, Any]]:

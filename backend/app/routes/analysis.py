@@ -103,13 +103,61 @@ def _translate_analysis(analysis_dict: dict[str, Any], target: str) -> dict[str,
     return d
 
 
+def _translate_segments_batch(segs_raw: list[dict], target: str) -> list[TranscriptSegment]:
+    """Traduce todos los segmentos en una sola llamada LLM (batch)."""
+    if not segs_raw:
+        return []
+    texts = [s.get("text", "") for s in segs_raw]
+    lang_name = "English" if target.startswith("en") else "Spanish"
+    prompt = (
+        f"Translate the following dialogue segments to {lang_name}. "
+        "Return ONLY a JSON array of translated strings, preserving the exact order. "
+        "Keep names, numbers and technical terms unchanged.\n\n"
+        f"INPUT:\n{json.dumps(texts, ensure_ascii=False)}"
+    )
+    result = llm.complete_json(prompt)
+    if isinstance(result, list) and len(result) == len(texts):
+        translated = []
+        for i, s in enumerate(segs_raw):
+            ns = dict(s)
+            ns["text"] = str(result[i]) if i < len(result) else s.get("text", "")
+            try:
+                translated.append(TranscriptSegment(**ns))
+            except Exception:
+                translated.append(TranscriptSegment(**s))
+        return translated
+    # Fallback: devolver sin traducir
+    return [TranscriptSegment(**s) for s in segs_raw]
+
+
+# Cache de transcripciones traducidas: {audio_id}_{lang} -> list[dict]
+_transcript_cache: dict[str, list] = {}
+
+
 @router.get("/{audio_id}/transcript", response_model=TranscriptOut)
-def get_transcript(audio_id: str, db: Session = Depends(get_db)):
+def get_transcript(
+    audio_id: str,
+    lang: str | None = Query(None, description="Idioma destino (es/en). Si difiere del original, se traduce."),
+    db: Session = Depends(get_db),
+):
     t = db.query(Transcript).filter(Transcript.audio_id == audio_id).first()
     if not t:
         raise HTTPException(404, "Transcripcion no disponible")
     segs_raw = (t.segments_json or {}).get("segments", [])
-    segments = [TranscriptSegment(**s) for s in segs_raw]
+
+    target = (lang or "")[:2].lower()
+    original = (t.language or "es")[:2].lower()
+
+    if target and target != original:
+        cache_key = f"{audio_id}_{target}"
+        if cache_key in _transcript_cache:
+            segments = [TranscriptSegment(**s) for s in _transcript_cache[cache_key]]
+        else:
+            segments = _translate_segments_batch(segs_raw, target)
+            _transcript_cache[cache_key] = [s.model_dump() for s in segments]
+    else:
+        segments = [TranscriptSegment(**s) for s in segs_raw]
+
     return TranscriptOut(
         id=t.id, audio_id=t.audio_id, language=t.language,
         full_text=t.full_text, cleaned_text=t.cleaned_text, segments=segments,
