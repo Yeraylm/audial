@@ -52,13 +52,15 @@
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 html { scroll-behavior: smooth; }
 
-/* ── Custom scrollbar ── */
-::-webkit-scrollbar              { width:6px; height:6px; }
-::-webkit-scrollbar-track        { background:var(--bg-1); border-radius:999px; }
-::-webkit-scrollbar-thumb        { background:var(--amber-dk); border-radius:999px; transition:background .2s; }
-::-webkit-scrollbar-thumb:hover  { background:var(--amber); box-shadow:0 0 8px rgba(57,255,20,.5); }
-::-webkit-scrollbar-corner       { background:var(--bg-1); }
-* { scrollbar-width:thin; scrollbar-color:var(--amber-dk) var(--bg-1); }
+/* ── Custom scrollbar: neon floating pill, no track ── */
+::-webkit-scrollbar             { width:4px; height:4px; }
+::-webkit-scrollbar-track       { background:transparent; }
+::-webkit-scrollbar-thumb       { background:var(--amber); border-radius:999px;
+                                   box-shadow:0 0 8px var(--amber),0 0 18px rgba(57,255,20,.35); }
+::-webkit-scrollbar-thumb:hover { background:var(--amber-lt);
+                                   box-shadow:0 0 14px var(--amber),0 0 28px rgba(57,255,20,.6); }
+::-webkit-scrollbar-corner      { background:transparent; }
+* { scrollbar-width:thin; scrollbar-color:var(--amber) transparent; }
 
 body {
   font-family:'Space Grotesk',-apple-system,system-ui,sans-serif;
