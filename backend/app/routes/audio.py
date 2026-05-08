@@ -214,6 +214,31 @@ def delete_audio(audio_id: str, request: Request, db: Session = Depends(get_db))
     return {"deleted": audio_id}
 
 
+@router.post("/{audio_id}/reupload")
+async def reupload_audio(
+    audio_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Re-sube el fichero de audio sin borrar el análisis existente."""
+    a = db.query(Audio).filter(Audio.id == audio_id).first()
+    if not a:
+        raise HTTPException(404, "Audio no encontrado")
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_EXT:
+        raise HTTPException(400, f"Extensión '{ext}' no soportada")
+    dest = settings.audio_dir / f"{audio_id}{ext}"
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    a.filepath   = str(dest)
+    a.size_bytes = dest.stat().st_size
+    storage_url  = cloud_storage.upload(dest, f"{audio_id}{ext}", a.mime_type or "audio/mpeg")
+    if storage_url:
+        a.storage_url = storage_url
+    db.commit()
+    return {"id": audio_id, "storage_url": storage_url}
+
+
 @router.patch("/{audio_id}/rename")
 def rename_audio(audio_id: str, body: RenameIn, db: Session = Depends(get_db)):
     a = db.query(Audio).filter(Audio.id == audio_id).first()

@@ -52,6 +52,14 @@
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 html { scroll-behavior: smooth; }
 
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar              { width:6px; height:6px; }
+::-webkit-scrollbar-track        { background:var(--bg-1); border-radius:999px; }
+::-webkit-scrollbar-thumb        { background:var(--amber-dk); border-radius:999px; transition:background .2s; }
+::-webkit-scrollbar-thumb:hover  { background:var(--amber); box-shadow:0 0 8px rgba(57,255,20,.5); }
+::-webkit-scrollbar-corner       { background:var(--bg-1); }
+* { scrollbar-width:thin; scrollbar-color:var(--amber-dk) var(--bg-1); }
+
 body {
   font-family:'Space Grotesk',-apple-system,system-ui,sans-serif;
   background: var(--bg-0);

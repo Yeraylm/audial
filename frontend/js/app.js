@@ -536,6 +536,38 @@ window.removeAudio = async function(id) {
   if (id === currentAudioId) showPage('conversations');
 };
 
+window.reuploadAudio = async function(id, warnEl) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.mp3,.wav,.m4a,.ogg,.flac';
+  input.onchange = async e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (warnEl) warnEl.innerHTML = `<span style="color:var(--tx-2);font-size:13px">⏳ ${t('audio.reuploading')}</span>`;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch(`${API}/api/audio/${id}/reupload`, { method: 'POST', body: fd });
+      if (!r.ok) throw new Error(await r.text());
+      // Restaurar el reproductor
+      const playerBar = $('#audioPlayerBar');
+      if (playerBar && warnEl) {
+        const audio = document.createElement('audio');
+        audio.id = 'audioPlayer';
+        audio.controls = true;
+        audio.preload = 'none';
+        audio.className = 'audio-player-ctrl';
+        audio.innerHTML = `<source id="audioPlayerSrc" src="${API}/api/audio/${id}/file" />`;
+        warnEl.replaceWith(audio);
+        audio.load();
+      }
+    } catch (err) {
+      if (warnEl) warnEl.innerHTML = `<span style="color:var(--tx-3);font-size:13px">❌ ${esc(err.message)}</span>`;
+    }
+  };
+  input.click();
+};
+
 // ── Rename Modal ──────────────────────────────────────────────────────
 let _renameBsModal = null;
 let _renameTargetId = null;
@@ -626,8 +658,13 @@ window.openAudio = async function(id) {
     // Handle missing file (HF Spaces ephemeral storage wipe on restart)
     player.onerror = () => {
       const warn = document.createElement('div');
-      warn.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;color:var(--tx-3);font-size:13px';
-      warn.innerHTML = `<i data-lucide="file-x" style="width:15px;height:15px;flex-shrink:0"></i>${t('audio.file.unavail')}`;
+      warn.className = 'audio-unavail';
+      warn.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;color:var(--tx-3);font-size:13px;flex-wrap:wrap';
+      warn.innerHTML = `<i data-lucide="file-x" style="width:15px;height:15px;flex-shrink:0"></i><span>${t('audio.file.unavail')}</span>
+        <button class="btn btn-sm btn-outline-accent ms-2" style="font-size:11px;padding:3px 10px"
+          onclick="reuploadAudio('${id}',this.closest('.audio-unavail'))">
+          <i data-lucide="upload" style="width:12px;height:12px"></i> ${t('audio.reupload')}
+        </button>`;
       player.replaceWith(warn);
       refreshIcons();
     };
@@ -1145,7 +1182,7 @@ async function _doRegister(e) {
       if (descEl) descEl.textContent = t('auth.code_sent_email');
       devDisplay?.classList.add('hidden');
     } else {
-      if (descEl) descEl.textContent = '⚠️ No hay servicio de email configurado. Tu código es:';
+      if (descEl) descEl.textContent = t('auth.code_screen');
       if (devDisplay && data.dev_code) {
         if (devCodeVal) devCodeVal.textContent = data.dev_code;
         devDisplay.classList.remove('hidden');

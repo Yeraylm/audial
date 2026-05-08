@@ -141,7 +141,7 @@ def _wrap(body: str, preheader: str = "") -> str:
               <td align="center">
                 <p style="margin:0 0 6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
                           font-size:12px;color:{C_MUTED};line-height:1.6;">
-                  Audial &middot; Plataforma IA Conversacional &middot; 100% Local
+                  Audial &middot; Plataforma IA Conversacional &middot; TFM 2026
                 </p>
                 <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
                           font-size:12px;color:{C_MUTED};">
