@@ -57,8 +57,11 @@ app.include_router(dashboard.router)
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "app": settings.app_name, "version": "1.0.0"}
+def health() -> dict:
+    # `features` permite a la app móvil saber qué admite este servidor (un servidor antiguo
+    # ignoraría `analyze=false` y analizaría todo al subir)
+    return {"status": "ok", "app": settings.app_name, "version": "1.0.0",
+            "features": ["store_only", "profile_update"]}
 
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"

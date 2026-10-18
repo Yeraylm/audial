@@ -100,6 +100,11 @@ class Audio(Base):
     expires_at:  Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)
     # URL de Supabase Storage (persiste aunque el servidor se reinicie)
     storage_url: Mapped[str|None]        = mapped_column(String(1024), nullable=True)
+    # Metadatos de llamada (los rellena la app móvil; NULL para audios subidos desde la web)
+    call_type:       Mapped[str|None]    = mapped_column(String(16),  nullable=True)   # incoming | outgoing
+    phone_number:    Mapped[str|None]    = mapped_column(String(64),  nullable=True)
+    contact_name:    Mapped[str|None]    = mapped_column(String(128), nullable=True)
+    call_started_at: Mapped[dt.datetime|None] = mapped_column(DateTime, nullable=True)  # UTC
 
     jobs       = relationship("Job",        back_populates="audio", cascade="all, delete")
     transcript = relationship("Transcript", back_populates="audio", uselist=False, cascade="all, delete")
@@ -206,6 +211,10 @@ def init_db() -> None:
         _add_column_if_missing(conn, "audios", "user_id",     "VARCHAR(64)")
         _add_column_if_missing(conn, "audios", "expires_at",   "DATETIME")
         _add_column_if_missing(conn, "audios", "storage_url",  "VARCHAR(1024)")
+        _add_column_if_missing(conn, "audios", "call_type",       "VARCHAR(16)")
+        _add_column_if_missing(conn, "audios", "phone_number",    "VARCHAR(64)")
+        _add_column_if_missing(conn, "audios", "contact_name",    "VARCHAR(128)")
+        _add_column_if_missing(conn, "audios", "call_started_at", "TIMESTAMP")
         _add_column_if_missing(conn, "users",  "role_id",      "INTEGER DEFAULT 3")
         _add_column_if_missing(conn, "users",  "password_enc", "VARCHAR(512)")
 

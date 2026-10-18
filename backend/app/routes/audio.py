@@ -28,6 +28,21 @@ ALLOWED_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
 
 class RenameIn(BaseModel):
     filename: str
+    contact_name: str | None = None   # la app móvil renombra por contacto
+
+
+# Etapa del job de un audio guardado pero no analizado
+STORED_STAGE = "stored"
+
+
+def _from_ms(ms: int | None) -> dt.datetime | None:
+    """Epoch en milisegundos → datetime UTC naive (como el resto de fechas de la BD)."""
+    if not ms or ms <= 0:
+        return None
+    try:
+        return dt.datetime.utcfromtimestamp(ms / 1000)
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def _session_id(request: Request) -> str:
@@ -52,6 +67,12 @@ async def upload_audio(
     file: UploadFile = File(...),
     language: str | None = Form(None),
     ui_language: str | None = Form("es"),
+    # La app móvil guarda copia en la nube sin analizar hasta que el usuario lo pida
+    analyze: bool = Form(True),
+    call_type: str | None = Form(None),
+    phone_number: str | None = Form(None),
+    contact_name: str | None = Form(None),
+    started_at_ms: int | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_current_user),
 ):
@@ -71,6 +92,10 @@ async def upload_audio(
         session_id=session_id, ui_language=output_lang,
         user_id=current_user.id if current_user else None,
         expires_at=expires,
+        call_type=(call_type or None) and call_type.strip().lower()[:16],
+        phone_number=(phone_number or None) and phone_number.strip()[:64],
+        contact_name=(contact_name or None) and contact_name.strip()[:128],
+        call_started_at=_from_ms(started_at_ms),
     )
     db.add(audio); db.commit(); db.refresh(audio)
 
@@ -86,11 +111,53 @@ async def upload_audio(
         audio.storage_url = storage_url
     db.commit()
 
+    if not analyze:
+        # Solo guardar: el audio queda en la cuenta (visible en web y app) sin gastar IA
+        job = Job(audio_id=audio.id, status=JobStatus.PENDING, stage=STORED_STAGE,
+                  message="Guardado sin analizar")
+        db.add(job); db.commit(); db.refresh(job)
+        return job
+
     job = Job(audio_id=audio.id, status=JobStatus.PENDING, stage="queued", message="En cola")
     db.add(job); db.commit(); db.refresh(job)
 
     whisper_lang = None if not language or language == "auto" else language
     background.add_task(process_single_audio, audio.id, True, whisper_lang, output_lang)
+    return job
+
+
+@router.post("/{audio_id}/analyze", response_model=JobOut)
+def analyze_stored_audio(
+    audio_id: str,
+    background: BackgroundTasks,
+    language: str | None = Form(None),
+    ui_language: str | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user),
+):
+    """Lanza el análisis IA de un audio que se guardó sin analizar."""
+    a = db.query(Audio).filter(Audio.id == audio_id).first()
+    if not a:
+        raise HTTPException(404, "Audio no encontrado")
+    if a.user_id and (not current_user or current_user.id != a.user_id):
+        raise HTTPException(403, "Este audio pertenece a otra cuenta")
+    if not a.filepath or not Path(a.filepath).exists():
+        raise HTTPException(409, "El archivo de audio no está en el servidor; vuelve a subirlo")
+
+    # Se reutiliza el job existente (el pipeline toma el último job del audio)
+    job = db.query(Job).filter(Job.audio_id == audio_id).first()
+    if job is None:
+        job = Job(audio_id=audio_id)
+        db.add(job)
+    if _job_status_str(job) == "running":
+        return job     # ya se está analizando
+    job.status, job.stage, job.progress = JobStatus.PENDING, "queued", 0.0
+    job.message, job.started_at, job.finished_at = "En cola", None, None
+    db.commit(); db.refresh(job)
+
+    out_lang = (ui_language or a.ui_language or "es").lower()[:2]
+    whisper_lang = None if not language or language == "auto" else language
+    background.add_task(process_single_audio, audio_id, True, whisper_lang, out_lang)
     return job
 
 
@@ -147,9 +214,15 @@ def list_audios(
                     "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
                     "expires_at":  a.expires_at.isoformat() if a.expires_at else None,
                     "is_guest":    a.user_id is None,
+                    "job_id":      str(latest_job.id) if latest_job else None,
                     "job_status":  _job_status_str(latest_job),
                     "job_stage":   str(latest_job.stage   if latest_job else ""),
                     "job_message": str(latest_job.message if latest_job else ""),
+                    # Metadatos de llamada (app móvil); None en audios subidos desde la web
+                    "call_type":       a.call_type,
+                    "phone_number":    a.phone_number,
+                    "contact_name":    a.contact_name,
+                    "call_started_at": a.call_started_at.isoformat() if a.call_started_at else None,
                 })
             except Exception as e:
                 logger.warning(f"Skip audio {getattr(a,'id','?')}: {e}")
@@ -248,5 +321,7 @@ def rename_audio(audio_id: str, body: RenameIn, db: Session = Depends(get_db)):
     if not name:
         raise HTTPException(400, "Nombre requerido")
     a.filename = name
+    if body.contact_name is not None:
+        a.contact_name = body.contact_name.strip()[:128] or None
     db.commit()
-    return {"id": audio_id, "filename": name}
+    return {"id": audio_id, "filename": name, "contact_name": a.contact_name}

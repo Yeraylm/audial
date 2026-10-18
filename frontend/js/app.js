@@ -492,6 +492,15 @@ async function refreshAudios() {
 
     list.innerHTML = data.map(a => {
       const canOpen = a.job_status === 'done';
+      const stored  = a.job_stage === 'stored';           // guardado (p. ej. desde la app) sin analizar
+      const title   = a.contact_name || a.filename;
+      const callIcon = a.call_type === 'incoming' ? '↙ ' : a.call_type === 'outgoing' ? '↗ ' : '';
+      const when    = a.call_started_at || a.uploaded_at;
+      const analyzeBtn = stored
+        ? `<button class="btn btn-outline-accent btn-sm" onclick="event.stopPropagation();analyzeAudio('${a.id}')">
+             <i data-lucide="sparkles" class="nav-icon"></i> ${window.i18n?.lang === 'en' ? 'Analyze' : 'Analizar'}
+           </button>`
+        : '';
       const guestBadge = a.is_guest
         ? `<span class="badge-guest" title="Se eliminará automáticamente en 24h">⏱ temporal</span>`
         : '';
@@ -499,11 +508,12 @@ async function refreshAudios() {
         <div class="audio-row" onclick="${canOpen ? `openAudio('${a.id}')` : ''}">
           <div class="audio-avatar"><i data-lucide="audio-lines"></i></div>
           <div class="audio-meta">
-            <div class="name">${esc(a.filename)}</div>
-            <div class="sub">${fmtDur(a.duration_sec)} · ${fmtDate(a.uploaded_at)}</div>
+            <div class="name">${callIcon}${esc(title)}</div>
+            <div class="sub">${a.phone_number && a.phone_number !== title ? esc(a.phone_number) + ' · ' : ''}${fmtDur(a.duration_sec)} · ${fmtDate(when)}</div>
           </div>
           <div class="audio-actions">
-            ${getBadge(a.job_status)}
+            ${analyzeBtn}
+            ${getBadge(a.job_status, a.job_stage)}
             ${guestBadge}
             <button class="btn btn-link text-muted p-1" onclick="event.stopPropagation();renameAudio('${a.id}','${esc(a.filename)}')" title="${t('audio.rename')}">
               <i data-lucide="pencil" style="width:15px;height:15px"></i>
@@ -520,7 +530,22 @@ async function refreshAudios() {
   }
 }
 
-function getBadge(status) {
+window.analyzeAudio = async function(id) {
+  const r = await fetch(`${API}/api/audio/${id}/analyze`, {
+    method: 'POST', body: new URLSearchParams({ ui_language: window.i18n?.lang || 'es' }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    alert(typeof d.detail === 'string' ? d.detail : 'No se pudo iniciar el análisis');
+  }
+  refreshAudios();
+};
+
+function getBadge(status, stage) {
+  if (stage === 'stored') {
+    const txt = window.i18n?.lang === 'en' ? 'Not analyzed' : 'Sin analizar';
+    return `<span class="badge-pill" style="background:rgba(255,255,255,.06);color:var(--tx-2)">${txt}</span>`;
+  }
   const badges = {
     done:    `<span class="badge-pill badge-ok">${t('conv.badge.done')}</span>`,
     running: `<span class="badge-running"><span class="spinner-border" style="width:8px;height:8px;border-width:1px"></span> ${t('conv.badge.running')}</span>`,
