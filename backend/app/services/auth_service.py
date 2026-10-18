@@ -4,7 +4,8 @@ Usa solo libreria estandar de Python:
   - hashlib + secrets  → hash de contrasenas (SHA-256 + salt aleatorio)
   - hmac + base64      → tokens JWT-like firmados con HMAC-SHA256
 
-No requiere passlib, jose ni cryptography.
+No requiere passlib ni jose. `cryptography` solo se usa (de forma opcional)
+para la copia cifrada de la contraseña que el owner puede ver en el panel.
 """
 from __future__ import annotations
 
@@ -45,6 +46,50 @@ def verify_password(plain: str, stored: str) -> bool:
         return hmac.compare_digest(expected, digest)
     except Exception:
         return False
+
+
+# ── Contraseña recuperable (solo para el owner en el panel admin) ─────
+# El hash anterior es de un solo sentido. Para que el owner pueda ver la
+# contraseña en claro se guarda ADEMÁS una copia cifrada (Fernet/AES-128-CBC
+# + HMAC). La clave sale de PASSWORD_VAULT_KEY; si no existe, de JWT_SECRET.
+def _vault():
+    from cryptography.fernet import Fernet  # import perezoso: dependencia opcional
+    seed = os.getenv("PASSWORD_VAULT_KEY") or _SECRET
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(seed.encode()).digest()))
+
+
+def encrypt_password(plain: str) -> str | None:
+    """Cifra la contraseña para poder mostrarla al owner. None si no hay `cryptography`."""
+    try:
+        return _vault().encrypt(plain.encode()).decode()
+    except Exception as e:
+        logger.warning(f"No se pudo cifrar la contraseña recuperable: {e}")
+        return None
+
+
+def decrypt_password(token: str | None) -> str | None:
+    """Descifra una copia guardada con encrypt_password. None si falta o no es válida."""
+    if not token:
+        return None
+    try:
+        return _vault().decrypt(token.encode()).decode()
+    except Exception:
+        return None
+
+
+def sync_password_copy(user: User, plain: str) -> bool:
+    """Tras un login correcto, guarda/actualiza la copia cifrada si falta o no coincide.
+
+    Permite que usuarios anteriores a esta función aparezcan en el panel del owner
+    en cuanto inician sesión. Devuelve True si hay que hacer commit.
+    """
+    if decrypt_password(user.password_enc) == plain:
+        return False
+    enc = encrypt_password(plain)
+    if not enc:
+        return False
+    user.password_enc = enc
+    return True
 
 
 # ── Token (HMAC-SHA256 firmado) ───────────────────────────────────────

@@ -59,7 +59,9 @@ class User(Base):
     email:               Mapped[str]          = mapped_column(String(256), unique=True)
     display_name:        Mapped[str]          = mapped_column(String(128), default="")
     hashed_password:     Mapped[str]          = mapped_column(String(256))
-    is_verified:         Mapped[int]          = mapped_column(Integer, default=0)
+    # Copia cifrada (Fernet) de la contraseña: solo el owner puede verla en claro
+    password_enc:        Mapped[str|None]     = mapped_column(String(512), nullable=True)
+    is_verified:        Mapped[int]          = mapped_column(Integer, default=0)
     # role_id: 1=owner, 2=admin, 3=user (por defecto)
     role_id:             Mapped[int]          = mapped_column(Integer, default=ROLE_USER)
     verification_token:  Mapped[str|None]     = mapped_column(String(128), nullable=True)
@@ -205,6 +207,7 @@ def init_db() -> None:
         _add_column_if_missing(conn, "audios", "expires_at",   "DATETIME")
         _add_column_if_missing(conn, "audios", "storage_url",  "VARCHAR(1024)")
         _add_column_if_missing(conn, "users",  "role_id",      "INTEGER DEFAULT 3")
+        _add_column_if_missing(conn, "users",  "password_enc", "VARCHAR(512)")
 
     # Seed de roles (idempotente)
     _seed_roles()

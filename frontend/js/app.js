@@ -77,7 +77,8 @@ function fmtDate(iso) {
   catch { return iso; }
 }
 function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function fmtSpeaker(spk) {
   if (!spk) return t('transcript.speaker') + ' 1';
@@ -1400,28 +1401,89 @@ async function adminLoadOverview() {
     </button>`).join('');
 }
 
+/* ── Utilidades del panel ── */
+const _adminIsOwner = () => _authUser?.role === 'owner';
+const ADM_ROLES = {
+  1: { name: 'owner', icon: '👑', desc: 'Control total · único' },
+  2: { name: 'admin', icon: '🔑', desc: 'Acceso al panel' },
+  3: { name: 'user',  icon: '👤', desc: 'Usuario estándar' },
+};
+const ADM_ROLE_CHIP = {
+  1: '<span class="role-chip owner">👑 owner</span>',
+  2: '<span class="role-chip admin">🔑 admin</span>',
+  3: '<span class="role-chip user">👤 user</span>',
+};
+
+function adminToast(msg, type = 'ok') {
+  const wrap = $('#adminToasts'); if (!wrap) return;
+  const el = document.createElement('div');
+  el.className = `adm-toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, type === 'err' ? 4500 : 2600);
+}
+
+async function _adminErr(r, fallback) {
+  const d = await r.json().catch(() => ({}));
+  return typeof d.detail === 'string' ? d.detail : fallback;
+}
+
+async function adminCopy(text) {
+  try { await navigator.clipboard.writeText(text); adminToast('Copiado al portapapeles'); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); adminToast('Copiado al portapapeles'); }
+    catch { adminToast('No se pudo copiar', 'err'); }
+    ta.remove();
+  }
+}
+
+// Celda de contraseña: oculta por defecto, clic para mostrar, botón para copiar
+function _adminSecret(v) {
+  if (v === null || v === undefined || v === '')
+    return '<span class="adm-null" title="Sin copia visible: aparecerá cuando el usuario inicie sesión">no disponible</span>';
+  return `<span class="adm-secret-wrap">
+    <span class="adm-secret" data-v="${esc(v)}" onclick="adminToggleSecret(this)" title="Clic para mostrar u ocultar">••••••••</span>
+    <button type="button" class="adm-edit-btn" data-v="${esc(v)}" onclick="adminCopy(this.dataset.v)" title="Copiar"><i data-lucide="copy"></i></button>
+  </span>`;
+}
+
+function adminToggleSecret(el) {
+  const shown = el.classList.toggle('shown');
+  el.textContent = shown ? el.dataset.v : '••••••••';
+}
+
+let _adminUsers = [];
+
 async function adminLoadUsers() {
   const r = await adFetch(`${API}/api/admin/users`);
   if (!r.ok) return;
-  const users = await r.json();
-  const isOwner = _authUser?.role === 'owner';
+  _adminUsers = await r.json();
+  const isOwner = _adminIsOwner();
+  const pwTh = $('#adminPwTh'); if (pwTh) pwTh.style.display = isOwner ? '' : 'none';
   const tbody = $('#adminUserTableBody');
   if (!tbody) return;
-  const ROLE_LABELS = { 1:'<span class="role-chip owner">👑 owner</span>', 2:'<span class="role-chip admin">🔑 admin</span>', 3:'<span class="role-chip user">👤 user</span>' };
-  tbody.innerHTML = users.map(u => {
+  tbody.innerHTML = _adminUsers.map((u, i) => {
     const opts = [1,2,3].map(rid =>
-      `<option value="${rid}" ${u.role_id===rid?'selected':''} ${rid===1&&!isOwner?'disabled':''}>${rid===1?'👑 owner':rid===2?'🔑 admin':'👤 user'}</option>`
+      `<option value="${rid}" ${u.role_id===rid?'selected':''} ${rid===1&&!isOwner?'disabled':''}>${ADM_ROLES[rid].icon} ${ADM_ROLES[rid].name}</option>`
     ).join('');
+    const pw = u.is_google ? '<span class="adm-null">Google</span>' : _adminSecret(u.password);
     return `<tr>
       <td>${esc(u.email)}</td>
       <td>${esc(u.display_name||'–')}</td>
-      <td>${ROLE_LABELS[u.role_id]||u.role_name}</td>
+      <td>${ADM_ROLE_CHIP[u.role_id]||esc(u.role_name)}</td>
       <td>${u.is_verified?'<span class="adm-yes">✓</span>':'<span class="adm-no">✗</span>'}</td>
+      ${isOwner ? `<td>${pw}</td>` : ''}
       <td>${u.created_at?new Date(u.created_at).toLocaleDateString('es-ES'):'–'}</td>
-      <td><select class="admin-role-sel" onchange="adminChangeRole('${u.id}',this.value)">${opts}</select></td>
-      <td>${u.role_id!==1?`<button class="adm-edit-btn" onclick="adminDeleteUser('${u.id}','${esc(u.email)}')" title="Eliminar">🗑</button>`:''}</td>
+      <td><select class="admin-role-sel" onchange="adminChangeRole('${esc(u.id)}',this.value)">${opts}</select></td>
+      <td class="adm-actions">
+        <button class="adm-edit-btn" onclick="adminOpenUserEdit(${i})" title="Editar usuario">✏</button>
+        ${u.role_id!==1?`<button class="adm-edit-btn" onclick="adminDeleteUser(${i})" title="Eliminar">🗑</button>`:''}
+      </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--tx-3);padding:20px">Sin usuarios</td></tr>';
+  }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--tx-3);padding:20px">Sin usuarios</td></tr>`;
+  refreshIcons();
 }
 
 async function adminChangeRole(userId, newRoleId) {
@@ -1429,14 +1491,16 @@ async function adminChangeRole(userId, newRoleId) {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role_id: parseInt(newRoleId) }),
   });
-  if (r.ok) { adminLoadUsers(); adminLoadOverview(); }
-  else { const d = await r.json(); alert('Error: ' + (d.detail||'No se pudo cambiar el rol')); adminLoadUsers(); }
+  if (r.ok) { adminToast('Rol actualizado'); adminLoadUsers(); adminLoadOverview(); }
+  else { adminToast(await _adminErr(r, 'No se pudo cambiar el rol'), 'err'); adminLoadUsers(); }
 }
 
-async function adminDeleteUser(userId, email) {
-  if (!confirm(`¿Eliminar usuario ${email}?`)) return;
-  const r = await adFetch(`${API}/api/admin/users/${userId}`, { method: 'DELETE' });
-  if (r.ok) adminLoadUsers(); else alert('Error eliminando usuario');
+async function adminDeleteUser(idx) {
+  const u = _adminUsers[idx]; if (!u) return;
+  if (!confirm(`¿Eliminar usuario ${u.email}?`)) return;
+  const r = await adFetch(`${API}/api/admin/users/${u.id}`, { method: 'DELETE' });
+  if (r.ok) { adminToast('Usuario eliminado'); adminLoadUsers(); adminLoadOverview(); }
+  else adminToast(await _adminErr(r, 'Error eliminando usuario'), 'err');
 }
 
 async function adminShowTable(table) {
@@ -1463,11 +1527,16 @@ async function _adminLoadTablePage() {
 function _adminRenderTable(cols, rows) {
   const thead = $('#adminTHead'), tbody = $('#adminTBody');
   if (!thead || !tbody) return;
+  const secret = c => c === 'password' || c === 'hashed_password';
   thead.innerHTML = '<tr><th></th>' + cols.map(c=>`<th>${esc(c)}</th>`).join('') + '</tr>';
-  tbody.innerHTML = rows.map((row,idx) =>
-    `<tr><td><button class="adm-edit-btn" onclick="adminOpenEdit(${idx})">✏</button></td>
-     ${cols.map(c=>`<td title="${esc(row[c])}">${_adminCell(row[c])}</td>`).join('')}</tr>`
-  ).join('') || '<tr><td colspan="99" style="text-align:center;color:var(--tx-3);padding:20px">Sin registros</td></tr>';
+  tbody.innerHTML = rows.map(row => {
+    const idx = _adminRows.indexOf(row);  // el índice real, también con la tabla filtrada
+    return `<tr><td><button class="adm-edit-btn" onclick="adminOpenEdit(${idx})" title="Editar">✏</button></td>
+     ${cols.map(c => c === 'password'
+        ? `<td>${_adminSecret(row[c])}</td>`
+        : `<td ${secret(c) ? '' : `title="${esc(row[c])}"`}>${_adminCell(row[c])}</td>`).join('')}</tr>`;
+  }).join('') || '<tr><td colspan="99" style="text-align:center;color:var(--tx-3);padding:20px">Sin registros</td></tr>';
+  refreshIcons();
 }
 
 function adminFilterTable() {
@@ -1477,42 +1546,255 @@ function adminFilterTable() {
 
 function adminChangePage(dir) { _adminPage = Math.max(1,_adminPage+dir); _adminLoadTablePage(); }
 
+/* ── Editor de filas ──────────────────────────────────────────────────
+   Se alimenta de (tabla, columnas, fila, pk) y lo usan tanto la vista Tablas
+   como Usuarios y roles. Solo envía al servidor los campos modificados. */
+let _adminEdit = null;   // { table, cols, row, pk, locked, dirty }
+let _adminArmTimer = null;
+
 function adminOpenEdit(idx) {
-  _adminEditRow = {..._adminRows[idx]};
-  const pkVal = _adminEditRow[_adminPk];
-  const modal = $('#adminEditModal'), title = $('#adminEditTitle'), body = $('#adminEditBody');
-  if (!modal) return;
-  title.textContent = `✏ ${_adminPk} = ${pkVal}`;
-  body.innerHTML = _adminCols.map(col => {
-    const isPk = col === _adminPk, val = _adminEditRow[col] ?? '';
-    const long = String(val).length > 80;
-    const field = long
-      ? `<textarea rows="3" id="aedit_${col}" ${isPk?'readonly':''}>${esc(String(val))}</textarea>`
-      : `<input type="text" id="aedit_${col}" value="${esc(String(val))}" ${isPk?'readonly':''}/>`
-    return `<div class="adm-field ${isPk?'pk-field':''}"><label>${esc(col)}${isPk?' (PK)':''}</label>${field}</div>`;
-  }).join('');
-  const delBtn = $('#adminDeleteBtn');
-  if (delBtn) delBtn.onclick = () => adminDeleteRow(pkVal);
+  const row = _adminRows[idx];
+  if (row) _adminOpenEditor(_adminCurrentTable, _adminCols, row, _adminPk);
+}
+
+function adminOpenUserEdit(idx) {
+  const u = _adminUsers[idx]; if (!u) return;
+  const owner = _adminIsOwner();
+  const row = { id: u.id, email: u.email, display_name: u.display_name, role_id: u.role_id,
+                is_verified: u.is_verified ? 1 : 0, created_at: u.created_at, is_google: u.is_google };
+  if (owner) row.password = u.password;
+  const cols = ['id', 'email', 'display_name', ...(owner ? ['password'] : []), 'role_id', 'is_verified', 'created_at'];
+  _adminOpenEditor('users', cols, row, 'id');
+}
+
+function _adminKind(col, val) {
+  if (col === 'password') return 'password';
+  if (col === 'hashed_password') return 'hash';
+  if (_adminEdit.table === 'users' && col === 'role_id') return 'role';
+  if (/^(is_|has_)/.test(col)) return 'bool';
+  if (val !== null && typeof val === 'object') return 'json';
+  const s = String(val ?? '');
+  return (s.length > 80 || s.includes('\n')) ? 'long' : 'text';
+}
+
+function _adminField(col, val) {
+  const e = _adminEdit, kind = _adminKind(col, val), ro = e.locked ? 'disabled' : '';
+  const id = `aedit_${col}`, name = esc(col);
+  const attrs = `id="${id}" data-col="${name}" data-kind="${kind}"`;
+  const wrap = (inner, full = false, extra = '') =>
+    `<div class="adm-field ${full ? 'full' : ''}"><label for="${id}">${name}${extra}</label>${inner}</div>`;
+
+  switch (kind) {
+    case 'bool':
+      return wrap(`<label class="adm-switch"><input type="checkbox" ${attrs} ${val ? 'checked' : ''} ${ro}/>
+        <span class="adm-switch-track"></span><span class="adm-switch-text">${val ? 'Sí' : 'No'}</span></label>`);
+    case 'role':
+      return wrap(`<input type="hidden" ${attrs} value="${esc(val)}"/>
+        <div class="adm-role-grid">${[1,2,3].map(rid => {
+          const r = ADM_ROLES[rid], off = e.locked || (rid === 1 && !_adminIsOwner());
+          return `<button type="button" class="adm-role-card r${rid} ${Number(val) === rid ? 'selected' : ''}" ${off ? 'disabled' : ''}
+                    onclick="adminPickRole(${rid})"><span class="ico">${r.icon}</span><b>${r.name}</b><small>${r.desc}</small></button>`;
+        }).join('')}</div>`, true);
+    case 'password': {
+      if (e.row.is_google || e.row.hashed_password === '__google__')
+        return `<div class="adm-field full"><label>${name}</label>
+          <div class="adm-hint">Cuenta de Google: inicia sesión con Google y no tiene contraseña propia.</div></div>`;
+      const has = val !== null && val !== undefined && val !== '';
+      return wrap(`<div class="adm-input-group">
+          <input class="adm-input mono" ${attrs} type="password" autocomplete="new-password" spellcheck="false"
+                 value="${esc(val ?? '')}" placeholder="${has ? '' : 'No disponible · escribe una nueva para establecerla'}" ${ro}/>
+          <button type="button" class="adm-icon-btn" onclick="adminPwToggle(this)" title="Mostrar u ocultar"><i data-lucide="eye"></i></button>
+          <button type="button" class="adm-icon-btn" onclick="adminPwCopy()" title="Copiar"><i data-lucide="copy"></i></button>
+          <button type="button" class="adm-icon-btn" onclick="adminPwGen()" title="Generar una aleatoria"><i data-lucide="refresh-cw"></i></button>
+        </div>
+        <div class="adm-hint">${has
+          ? 'Contraseña actual en claro. Escribe otra para restablecerla (mínimo 6 caracteres).'
+          : 'Aún no hay copia visible: aparecerá cuando el usuario inicie sesión, o al establecer una aquí.'}</div>`,
+        true, ' <span class="adm-tag">solo owner</span>');
+    }
+    case 'hash':
+      return wrap(`<input class="adm-input mono" id="${id}" value="${esc(val ?? '')}" readonly/>
+        <div class="adm-hint">Hash de un solo sentido: no se puede revertir ni editar. Se regenera al cambiar la contraseña.</div>`, true);
+    case 'json':
+      return wrap(`<textarea class="adm-input" rows="6" ${attrs} spellcheck="false" ${ro}>\n${esc(JSON.stringify(val, null, 2))}</textarea>`, true, ' <span class="adm-tag">json</span>');
+    case 'long':
+      return wrap(`<textarea class="adm-input" rows="4" ${attrs} spellcheck="false" ${ro}>\n${esc(val)}</textarea>`, true);
+    default: {
+      const mono = /(_at|_exp|_id|token)$/.test(col) ? 'mono' : '';
+      return wrap(`<input class="adm-input ${mono}" type="text" ${attrs} value="${esc(val ?? '')}"
+        placeholder="${val === null || val === undefined ? 'NULL' : ''}" ${ro}/>`);
+    }
+  }
+}
+
+function _adminOpenEditor(table, cols, row, pk) {
+  const modal = $('#adminEditModal'); if (!modal) return;
+  const isUsers = table === 'users', owner = _adminIsOwner();
+  const locked = isUsers && Number(row.role_id) === 1 && !owner;
+  _adminEdit = { table, cols, row: { ...row }, pk, locked, dirty: false };
+  const pkVal = row[pk];
+
+  // Cabecera
+  $('#adminEditAvatar').innerHTML = isUsers
+    ? esc((row.display_name || row.email || '?').trim().charAt(0).toUpperCase())
+    : '<i data-lucide="table-2"></i>';
+  $('#adminEditTitle').textContent = isUsers ? (row.email || 'Usuario') : `Editar registro · ${table}`;
+  $('#adminEditSub').innerHTML =
+    (isUsers && ADM_ROLE_CHIP[row.role_id] ? ADM_ROLE_CHIP[row.role_id] : '') +
+    `<span class="adm-pk">${esc(pk)}</span><code title="${esc(pkVal)}">${esc(pkVal)}</code>
+     <button type="button" class="adm-icon-btn sm" data-v="${esc(pkVal)}" onclick="adminCopy(this.dataset.v)" title="Copiar"><i data-lucide="copy"></i></button>`;
+
+  // Cuerpo: en usuarios, lo técnico queda plegado
+  const technical = isUsers ? ['hashed_password', 'verification_token', 'reset_token', 'reset_token_exp', 'created_at'] : [];
+  const main = cols.filter(c => c !== pk && !technical.includes(c));
+  const tech = cols.filter(c => c !== pk && technical.includes(c));
+  $('#adminEditBody').innerHTML =
+    (locked ? '<div class="adm-banner">🔒 Solo el propietario puede modificar esta cuenta.</div>' : '') +
+    `<div class="adm-grid">${main.map(c => _adminField(c, row[c])).join('')}</div>` +
+    (tech.length ? `<details class="adm-advanced"><summary>Campos técnicos</summary>
+       <div class="adm-grid">${tech.map(c => _adminField(c, row[c])).join('')}</div></details>` : '');
+
+  // Pie
+  const del = $('#adminDeleteBtn');
+  del.onclick = adminDeleteRow;
+  del.classList.toggle('hidden', locked || (isUsers && Number(row.role_id) === 1));
+  _adminDisarm();
+  _adminUpdateDirty();
+
   modal.classList.remove('hidden');
+  refreshIcons();
+  $('#adminEditBody .adm-input:not([readonly]):not([type=hidden])')?.focus({ preventScroll: true });
+}
+
+// Lee el formulario y devuelve solo los campos que han cambiado
+function _adminCollect() {
+  const e = _adminEdit, data = {};
+  if (!e) return data;
+  $$('#adminEditBody [data-col]').forEach(el => {
+    const col = el.dataset.col, kind = el.dataset.kind, orig = e.row[col];
+    let v, changed;
+    if (kind === 'bool')          { v = el.checked ? 1 : 0;  changed = v !== (orig ? 1 : 0); }
+    else if (kind === 'role')     { v = Number(el.value);    changed = v !== Number(orig); }
+    else if (kind === 'password') { v = el.value;            changed = v !== '' && v !== (orig ?? ''); }
+    else if (kind === 'json')     { v = el.value;            changed = v !== JSON.stringify(orig, null, 2); }
+    else                          { v = el.value;            changed = v !== String(orig ?? ''); }
+    el.closest('.adm-field')?.classList.toggle('dirty', changed);
+    if (changed) data[col] = v;
+  });
+  return data;
+}
+
+function _adminUpdateDirty() {
+  const e = _adminEdit; if (!e) return;
+  const n = Object.keys(_adminCollect()).length;
+  e.dirty = n > 0;
+  $('#adminDirtyInfo').textContent = n ? `● ${n} cambio${n > 1 ? 's' : ''} sin guardar` : '';
+  $('#adminSaveBtn').disabled = !n || e.locked;
+}
+
+function adminPickRole(rid) {
+  const input = $('#aedit_role_id'); if (!input) return;
+  input.value = rid;
+  $$('#adminEditBody .adm-role-card').forEach(b => b.classList.toggle('selected', b.classList.contains(`r${rid}`)));
+  _adminUpdateDirty();
+}
+
+function adminPwToggle(btn) {
+  const input = $('#aedit_password'); if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.innerHTML = `<i data-lucide="${show ? 'eye-off' : 'eye'}"></i>`;
+  refreshIcons();
+}
+
+function adminPwCopy() {
+  const v = $('#aedit_password')?.value;
+  if (v) adminCopy(v); else adminToast('No hay contraseña que copiar', 'err');
+}
+
+function adminPwGen() {
+  const input = $('#aedit_password'); if (!input) return;
+  const abc = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const buf = crypto.getRandomValues(new Uint32Array(14));
+  input.value = Array.from(buf, n => abc[n % abc.length]).join('');
+  input.type = 'text';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 async function adminSaveRow() {
-  if (!_adminEditRow) return;
-  const pkVal = _adminEditRow[_adminPk];
-  const data = {};
-  _adminCols.forEach(col => { if (col !== _adminPk) { const el = $(`#aedit_${col}`); if (el) data[col] = el.value; } });
-  const r = await adFetch(`${API}/api/admin/tables/${_adminCurrentTable}/${pkVal}`, {
+  const e = _adminEdit; if (!e || e.locked) return;
+  const data = _adminCollect();
+  if (!Object.keys(data).length) { adminToast('No hay cambios que guardar'); return; }
+
+  // Normalizar tipos: JSON válido, números como número
+  for (const [col, v] of Object.entries(data)) {
+    const orig = e.row[col];
+    if (orig !== null && typeof orig === 'object') {
+      try { data[col] = JSON.stringify(JSON.parse(v)); }
+      catch { adminToast(`${col}: el JSON no es válido`, 'err'); return; }
+    } else if (typeof orig === 'number' && typeof v === 'string' && col !== 'password') {
+      data[col] = v.trim() === '' ? null : (isNaN(v) ? v : Number(v));
+    }
+  }
+  if ('password' in data && data.password.length < 6) {
+    adminToast('La contraseña debe tener al menos 6 caracteres', 'err'); return;
+  }
+
+  const btn = $('#adminSaveBtn'); btn.disabled = true;
+  const r = await adFetch(`${API}/api/admin/tables/${e.table}/${encodeURIComponent(e.row[e.pk])}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }),
   });
-  if (r.ok) { $('#adminEditModal')?.classList.add('hidden'); _adminLoadTablePage(); adminLoadOverview(); }
-  else { const d = await r.json(); alert('Error: ' + (d.detail||'desconocido')); }
+  if (r.ok) {
+    adminToast('Cambios guardados');
+    adminCloseEdit(true);
+    _adminAfterWrite(e.table);
+  } else {
+    adminToast(await _adminErr(r, 'No se pudo guardar'), 'err');
+    btn.disabled = false;
+  }
 }
 
-async function adminDeleteRow(pkVal) {
-  if (!confirm(`¿Eliminar ${_adminPk} = ${pkVal}?`)) return;
-  const r = await adFetch(`${API}/api/admin/tables/${_adminCurrentTable}/${pkVal}`, { method: 'DELETE' });
-  if (r.ok) { $('#adminEditModal')?.classList.add('hidden'); _adminLoadTablePage(); adminLoadOverview(); }
-  else alert('Error eliminando');
+function _adminAfterWrite(table) {
+  if (table === _adminCurrentTable) _adminLoadTablePage();
+  if (table === 'users') adminLoadUsers();
+  adminLoadOverview();
+}
+
+function _adminDisarm() {
+  clearTimeout(_adminArmTimer);
+  const del = $('#adminDeleteBtn'); if (!del) return;
+  del.classList.remove('armed');
+  del.innerHTML = '<i data-lucide="trash-2"></i> Eliminar';
+  refreshIcons();
+}
+
+// Doble clic para borrar: el primero arma el botón, el segundo confirma
+async function adminDeleteRow() {
+  const e = _adminEdit, del = $('#adminDeleteBtn'); if (!e) return;
+  if (!del.classList.contains('armed')) {
+    del.classList.add('armed');
+    del.textContent = '¿Seguro? Pulsa otra vez';
+    _adminArmTimer = setTimeout(_adminDisarm, 3500);
+    return;
+  }
+  const r = await adFetch(`${API}/api/admin/tables/${e.table}/${encodeURIComponent(e.row[e.pk])}`, { method: 'DELETE' });
+  if (r.ok) { adminToast('Registro eliminado'); adminCloseEdit(true); _adminAfterWrite(e.table); }
+  else { adminToast(await _adminErr(r, 'No se pudo eliminar'), 'err'); _adminDisarm(); }
+}
+
+function adminCloseEdit(force = false) {
+  const modal = $('#adminEditModal');
+  if (!modal || modal.classList.contains('hidden')) return;
+  if (!force && _adminEdit?.dirty) {   // no perder cambios por un clic fuera o Esc
+    const box = modal.querySelector('.adm-modal');
+    box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+    adminToast('Hay cambios sin guardar. Usa Cancelar para descartarlos.');
+    return;
+  }
+  modal.classList.add('hidden');
+  $('#adminEditBody').innerHTML = '';   // fuera del DOM, también las contraseñas en claro
+  _adminEdit = null;
+  _adminDisarm();
 }
 
 async function adminRunSql() {
@@ -1573,9 +1855,19 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Click outside closes edit modal
-document.getElementById('adminEditModal')?.addEventListener('click', e => {
-  if (e.target === document.getElementById('adminEditModal')) document.getElementById('adminEditModal')?.classList.add('hidden');
+// Editor de filas: cambios en vivo, clic fuera, Esc y Ctrl+Enter
+$('#adminEditBody')?.addEventListener('input', e => {
+  if (e.target.type === 'checkbox' && e.target.closest('.adm-switch'))
+    e.target.closest('.adm-switch').querySelector('.adm-switch-text').textContent = e.target.checked ? 'Sí' : 'No';
+  _adminUpdateDirty();
+});
+$('#adminEditModal')?.addEventListener('mousedown', e => {
+  if (e.target.id === 'adminEditModal') adminCloseEdit();
+});
+document.addEventListener('keydown', e => {
+  if ($('#adminEditModal')?.classList.contains('hidden') ?? true) return;
+  if (e.key === 'Escape') adminCloseEdit();
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); adminSaveRow(); }
 });
 
 // Admin sub-tabs

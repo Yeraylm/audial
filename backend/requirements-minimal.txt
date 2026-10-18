@@ -19,3 +19,4 @@ psycopg2-binary==2.9.9
 alembic==1.13.3
 # Auth: implementacion pura Python (no requiere C extensions)
 # passlib y python-jose eliminados para evitar fallos en HF Spaces
+cryptography==43.0.1   # copia cifrada (Fernet) de la contraseña para el owner

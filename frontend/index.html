@@ -8,7 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="stylesheet" href="/css/styles.css?v=31" />
 </head>
 <body>
 
@@ -421,7 +421,7 @@
     </div>
     <div class="adm-table-wrap">
       <table class="adm-table-inline">
-        <thead><tr><th>Email</th><th>Nombre</th><th>Rol</th><th>Verificado</th><th>Creado</th><th>Cambiar rol</th><th></th></tr></thead>
+        <thead><tr><th>Email</th><th>Nombre</th><th>Rol</th><th>Verificado</th><th id="adminPwTh">Contraseña</th><th>Creado</th><th>Cambiar rol</th><th></th></tr></thead>
         <tbody id="adminUserTableBody"></tbody>
       </table>
     </div>
@@ -479,20 +479,26 @@
   </div>
 
   <!-- Edit row modal (inline) -->
-  <div class="adm-modal-overlay hidden" id="adminEditModal">
+  <div class="adm-modal-overlay hidden" id="adminEditModal" role="dialog" aria-modal="true" aria-labelledby="adminEditTitle">
     <div class="adm-modal">
       <div class="adm-modal-header">
-        <h3 id="adminEditTitle">Editar</h3>
-        <button onclick="$('#adminEditModal').classList.add('hidden')">✕</button>
+        <div class="adm-modal-avatar" id="adminEditAvatar"></div>
+        <div class="adm-modal-heading">
+          <h3 id="adminEditTitle">Editar</h3>
+          <div class="adm-modal-sub" id="adminEditSub"></div>
+        </div>
+        <button class="adm-modal-close" type="button" onclick="adminCloseEdit(true)" aria-label="Cerrar"><i data-lucide="x"></i></button>
       </div>
       <div id="adminEditBody" class="adm-modal-body"></div>
       <div class="adm-modal-footer">
-        <button class="adm-btn-danger" id="adminDeleteBtn">🗑 Eliminar</button>
-        <button class="adm-btn-sm" onclick="$('#adminEditModal').classList.add('hidden')">Cancelar</button>
-        <button class="adm-btn-primary" onclick="adminSaveRow()">Guardar</button>
+        <button class="adm-btn-danger" id="adminDeleteBtn" type="button"></button>
+        <span class="adm-dirty" id="adminDirtyInfo"></span>
+        <button class="adm-btn-sm" type="button" onclick="adminCloseEdit(true)">Cancelar</button>
+        <button class="adm-btn-primary" id="adminSaveBtn" type="button" onclick="adminSaveRow()"><i data-lucide="check"></i> Guardar</button>
       </div>
     </div>
   </div>
+  <div class="adm-toast-wrap" id="adminToasts" aria-live="polite"></div>
 
 </section>
 
@@ -642,7 +648,7 @@
 <!-- ?v=30 busts CDN cache -->
 <script src="/js/config.js?v=30"></script>
 <script src="/js/i18n.js?v=30"></script>
-<script src="/js/app.js?v=30"></script>
+<script src="/js/app.js?v=31"></script>
 
 </body>
 </html>

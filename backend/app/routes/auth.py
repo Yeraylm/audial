@@ -21,8 +21,8 @@ from sqlalchemy.orm import Session
 
 from app.models.database import ROLE_USER, User, get_db
 from app.services.auth_service import (
-    create_token, get_current_user,
-    hash_password, verify_password,
+    create_token, encrypt_password, get_current_user,
+    hash_password, sync_password_copy, verify_password,
 )
 from app.services.email_service import send_reset_email, send_verification_email
 
@@ -106,6 +106,7 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
     _PENDING[email] = {
         "code":            code,
         "hashed_password": hash_password(body.password),
+        "password_enc":    encrypt_password(body.password),
         "display_name":    display,
         "created_at":      time.time(),
     }
@@ -158,6 +159,7 @@ def verify_code(body: VerifyCodeIn, db: Session = Depends(get_db)):
         email=email,
         display_name=pending["display_name"],
         hashed_password=pending["hashed_password"],
+        password_enc=pending.get("password_enc"),
         is_verified=1,          # verificado desde el primer momento
         role_id=ROLE_USER,
     )
@@ -183,6 +185,8 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email.strip().lower()).first()
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(401, "Email o contraseña incorrectos")
+    if sync_password_copy(user, body.password):
+        db.commit()
     return TokenOut(
         token=create_token(user.id, user.email),
         user_id=user.id, email=user.email,
@@ -215,6 +219,7 @@ def reset_password(body: ResetIn, db: Session = Depends(get_db)):
     if len(body.new_password) < 6:
         raise HTTPException(400, "La contraseña debe tener al menos 6 caracteres")
     user.hashed_password = hash_password(body.new_password)
+    user.password_enc    = encrypt_password(body.new_password)
     user.reset_token     = None
     user.reset_token_exp = None
     db.commit()
