@@ -26,12 +26,34 @@ class GroqLLM:
     BASE = "https://api.groq.com/openai/v1"
     MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+    # Si el modelo configurado ya no existe en Groq (retiran modelos con frecuencia),
+    # se elige uno de estos, o el primer modelo de chat disponible.
+    PREFERRED = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b",
+                 "llama-3.1-8b-instant", "openai/gpt-oss-20b", "qwen/qwen3-32b"]
+    _NOT_CHAT = ("whisper", "guard", "tts", "playai", "distil", "embed")
+
     def __init__(self, api_key: str) -> None:
         self.api_key = api_key
+        self.model = self.MODEL
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+
+    def _pick_available_model(self) -> str | None:
+        """Pregunta a Groq qué modelos hay activos y elige uno de chat."""
+        try:
+            r = httpx.get(f"{self.BASE}/models", headers=self.headers, timeout=20)
+            r.raise_for_status()
+            ids = [m["id"] for m in r.json().get("data", []) if m.get("active", True)]
+        except Exception as e:
+            logger.error(f"Groq: no se pudo listar modelos: {e}")
+            return None
+        for pref in self.PREFERRED:
+            if pref in ids:
+                return pref
+        chat = [i for i in ids if not any(s in i for s in self._NOT_CHAT)]
+        return chat[0] if chat else None
 
     def complete(self, prompt: str, system: str | None = None,
                  temperature: float = 0.2, max_tokens: int = 2048) -> str:
@@ -39,8 +61,9 @@ class GroqLLM:
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        payload = {"model": self.MODEL, "messages": messages,
+        payload = {"model": self.model, "messages": messages,
                    "temperature": temperature, "max_tokens": max_tokens}
+        switched = False
         for attempt in range(4):
             try:
                 r = httpx.post(f"{self.BASE}/chat/completions",
@@ -50,6 +73,14 @@ class GroqLLM:
                     logger.warning(f"Groq 429 rate limit — reintentando en {wait}s (intento {attempt+1}/4)")
                     time.sleep(wait)
                     continue
+                if r.status_code in (400, 404):
+                    logger.error(f"Groq {r.status_code} con el modelo '{self.model}': {r.text[:300]}")
+                    alt = None if switched else self._pick_available_model()
+                    if alt and alt != self.model:
+                        logger.warning(f"Groq: '{self.model}' no está disponible, usando '{alt}'")
+                        self.model = payload["model"] = alt
+                        switched = True
+                        continue
                 r.raise_for_status()
                 return r.json()["choices"][0]["message"]["content"].strip()
             except httpx.HTTPStatusError:
@@ -71,7 +102,7 @@ class GroqLLM:
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        payload = {"model": self.MODEL, "messages": messages, "stream": True}
+        payload = {"model": self.model, "messages": messages, "stream": True}
         with httpx.stream("POST", f"{self.BASE}/chat/completions",
                           json=payload, headers=self.headers, timeout=120) as r:
             for line in r.iter_lines():

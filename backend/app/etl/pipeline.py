@@ -133,6 +133,15 @@ def process_single_audio(
         db.commit()
         result.transcript_ok = True
 
+        # Sin voz no hay nada que analizar: no gastar 14 llamadas al LLM con texto vacío
+        if not (tr.full_text or "").strip():
+            msg = ("No se detectó voz en el audio. Comprueba que la grabación se oiga "
+                   "(en algunos móviles Android bloquea la captura de la llamada).")
+            logger.warning(f"[{audio_id[:8]}] Transcripción vacía: {tr.duration:.0f}s sin voz")
+            result.errors.append(msg)
+            _update_job(db, job, JobStatus.FAILED, "no_speech", 1.0, msg)
+            return result
+
         # ---- Silver → Gold: análisis LLM ----
         # Obtener ui_language del registro de audio si no se pasó explícitamente
         if output_lang == "es":

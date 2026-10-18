@@ -258,12 +258,54 @@ def google_login(body: GoogleIn, db: Session = Depends(get_db)):
 
 
 # ── Me ────────────────────────────────────────────────────────────────
-@router.get("/me")
-def me(user: User | None = Depends(get_current_user)):
-    if not user:
-        return {"authenticated": False, "role": "guest"}
+def _me_payload(user: User) -> dict:
     return {
         "authenticated": True, "user_id": user.id,
         "email": user.email, "display_name": user.display_name,
         "is_verified": bool(user.is_verified), "role": user.role_name,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "is_google": user.hashed_password == "__google__",
     }
+
+
+@router.get("/me")
+def me(user: User | None = Depends(get_current_user)):
+    if not user:
+        return {"authenticated": False, "role": "guest"}
+    return _me_payload(user)
+
+
+class ProfileIn(BaseModel):
+    display_name: str | None = None
+    current_password: str | None = None
+    new_password: str | None = None
+
+
+@router.put("/me")
+def update_me(
+    body: ProfileIn,
+    user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Edita el perfil propio: nombre y/o contraseña (esta exige la actual)."""
+    if not user:
+        raise HTTPException(401, "Inicia sesión para editar tu perfil")
+
+    if body.display_name is not None:
+        name = body.display_name.strip()
+        if not 1 <= len(name) <= 60:
+            raise HTTPException(400, "El nombre debe tener entre 1 y 60 caracteres")
+        user.display_name = name
+
+    if body.new_password:
+        if user.hashed_password == "__google__":
+            raise HTTPException(400, "Las cuentas de Google no tienen contraseña propia")
+        if not verify_password(body.current_password or "", user.hashed_password):
+            raise HTTPException(403, "La contraseña actual no es correcta")
+        if len(body.new_password) < 6:
+            raise HTTPException(400, "La contraseña debe tener al menos 6 caracteres")
+        user.hashed_password = hash_password(body.new_password)
+        user.password_enc    = encrypt_password(body.new_password)
+
+    db.commit()
+    return _me_payload(user)

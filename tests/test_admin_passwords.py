@@ -160,6 +160,40 @@ def test_unknown_columns_are_ignored_and_roles_are_protected():
                          headers=owner).status_code == 400
 
 
+def _user_token(email: str, password: str) -> dict:
+    r = client.post("/api/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
+def test_profile_update_name_and_password():
+    _make_user("perfil@test.com", "perfil-clave-1", 3)
+    h = _user_token("perfil@test.com", "perfil-clave-1")
+
+    me = client.get("/api/auth/me", headers=h).json()
+    assert me["email"] == "perfil@test.com" and me["created_at"] and me["is_google"] is False
+
+    r = client.put("/api/auth/me", headers=h, json={"display_name": "  Nuevo Nombre "})
+    assert r.status_code == 200 and r.json()["display_name"] == "Nuevo Nombre"
+    assert client.put("/api/auth/me", headers=h, json={"display_name": "  "}).status_code == 400
+
+    # cambiar contraseña exige la actual
+    assert client.put("/api/auth/me", headers=h, json={"new_password": "otra-clave-2"}).status_code == 403
+    assert client.put("/api/auth/me", headers=h, json={
+        "current_password": "mala", "new_password": "otra-clave-2"}).status_code == 403
+    assert client.put("/api/auth/me", headers=h, json={
+        "current_password": "perfil-clave-1", "new_password": "123"}).status_code == 400
+    ok = client.put("/api/auth/me", headers=h, json={
+        "current_password": "perfil-clave-1", "new_password": "otra-clave-2"})
+    assert ok.status_code == 200
+    assert client.post("/api/auth/login", json={"email": "perfil@test.com", "password": "otra-clave-2"}).status_code == 200
+    assert client.post("/api/auth/login", json={"email": "perfil@test.com", "password": "perfil-clave-1"}).status_code == 401
+
+
+def test_profile_requires_login():
+    assert client.put("/api/auth/me", json={"display_name": "x"}).status_code == 401
+
+
 def test_register_flow_stores_recoverable_copy():
     r = client.post("/api/auth/register", json={
         "email": "nuevo@test.com", "password": "registro-123", "display_name": "Nuevo"})
